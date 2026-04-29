@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html lang="is">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vöxtun</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0d0f14; --surface: #161921; --surface2: #1e2330; --border: #2a3045;
+    --accent: #4fffb0; --accent2: #ff6b6b; --accent3: #ffd166;
+    --text: #e8ecf4; --muted: #6b7694; --verified: #3bb8ff;
+    --purple: #c77dff; --orange: #ff9f43; --teal: #00d4aa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Mono', monospace; min-height: 100vh; }
+
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-family: 'Syne', sans-serif; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+  .header-tag { font-size: 0.65rem; color: var(--muted); background: var(--surface2); border: 1px solid var(--border); padding: 4px 10px; border-radius: 4px; letter-spacing: 1px; text-transform: uppercase; }
+
+  .main { display: grid; grid-template-columns: 440px 1fr; min-height: calc(100vh - 57px); }
+
+  .panel { background: var(--surface); border-right: 1px solid var(--border); padding: 18px 18px; overflow-y: auto; max-height: calc(100vh - 57px); }
+
+  .section-title { font-family: 'Syne', sans-serif; font-size: 0.7rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; padding-bottom: 7px; border-bottom: 1px solid var(--border); }
+
+  /* PROPERTY */
+  .property-panel { background: rgba(0,212,170,0.05); border: 1px solid rgba(0,212,170,0.22); border-radius: 8px; padding: 12px; margin-bottom: 14px; }
+  .property-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .property-toggle-title { font-family: 'Syne', sans-serif; font-size: 0.68rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--teal); }
+  .toggle-switch { position: relative; width: 38px; height: 20px; cursor: pointer; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-track { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; transition: all 0.2s; }
+  .toggle-track:before { content: ''; position: absolute; height: 12px; width: 12px; left: 3px; top: 3px; background: var(--muted); border-radius: 50%; transition: all 0.2s; }
+  .toggle-switch input:checked + .toggle-track { background: rgba(0,212,170,0.2); border-color: var(--teal); }
+  .toggle-switch input:checked + .toggle-track:before { transform: translateX(18px); background: var(--teal); }
+  .property-fields { margin-top: 12px; display: flex; flex-direction: column; gap: 7px; }
+  .property-note { font-size: 0.6rem; color: var(--muted); background: rgba(0,212,170,0.05); border: 1px solid rgba(0,212,170,0.14); border-radius: 4px; padding: 5px 8px; line-height: 1.5; }
+
+  /* LOAN CARDS */
+  .loans-container { display: flex; flex-direction: column; gap: 9px; margin-bottom: 14px; }
+  .loan-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; transition: border-color 0.2s; }
+  .loan-card:hover { border-color: rgba(79,255,176,0.32); }
+  .loan-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; cursor: pointer; user-select: none; background: rgba(255,255,255,0.02); }
+  .loan-header-left { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .loan-num { font-family: 'Syne', sans-serif; font-size: 0.75rem; font-weight: 700; border-radius: 4px; padding: 2px 7px; }
+  .loan-type-badge { font-size: 0.59rem; letter-spacing: 1px; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+  .badge-vt { background: rgba(59,184,255,0.14); color: var(--verified); border: 1px solid rgba(59,184,255,0.28); }
+  .badge-ovt { background: rgba(255,209,102,0.14); color: var(--accent3); border: 1px solid rgba(255,209,102,0.28); }
+  .badge-annuitet { background: rgba(255,159,67,0.14); color: var(--orange); border: 1px solid rgba(255,159,67,0.28); }
+  .badge-jafnar { background: rgba(79,255,176,0.11); color: var(--accent); border: 1px solid rgba(79,255,176,0.28); }
+  .badge-hms { background: rgba(255,107,107,0.14); color: var(--accent2); border: 1px solid rgba(255,107,107,0.28); }
+  .loan-header-right { display: flex; align-items: center; gap: 5px; }
+  .remove-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; padding: 2px 4px; border-radius: 3px; transition: color 0.2s, background 0.2s; }
+  .remove-btn:hover { color: var(--accent2); background: rgba(255,107,107,0.1); }
+  .chevron { color: var(--muted); font-size: 0.74rem; transition: transform 0.2s; }
+  .chevron.open { transform: rotate(180deg); }
+  .loan-body { padding: 0 12px 12px; display: none; flex-direction: column; gap: 8px; }
+  .loan-body.open { display: flex; }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field.full { grid-column: 1 / -1; }
+  label { font-size: 0.59rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+
+  /* TEXT INPUTS — accept comma/dot */
+  input[type="text"], input[type="number"], select {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.81rem;
+    padding: 7px 8px; border-radius: 5px; outline: none; transition: border-color 0.2s; width: 100%;
+  }
+  input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: var(--accent); }
+  input[type="text"].invalid { border-color: var(--accent2) !important; background: rgba(255,107,107,0.06); }
+  select option { background: var(--surface2); }
+
+  .divider { height: 1px; background: var(--border); margin: 2px 0; }
+  .field-section { font-size: 0.59rem; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); padding: 2px 0 0; }
+
+  /* METHOD TOGGLE */
+  .method-toggle { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .method-btn { background: none; border: none; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 0.69rem; padding: 7px 4px; cursor: pointer; transition: all 0.15s; text-align: center; }
+  .method-btn.active-annuitet { background: rgba(255,159,67,0.14); color: var(--orange); }
+  .method-btn.active-jafnar { background: rgba(79,255,176,0.11); color: var(--accent); }
+  .method-btn:not(.active-annuitet):not(.active-jafnar):hover { background: rgba(255,255,255,0.04); }
+  .method-note { font-size: 0.59rem; color: var(--muted); line-height: 1.5; padding: 5px 8px; background: rgba(255,255,255,0.02); border-radius: 4px; border: 1px solid var(--border); }
+
+  /* EXTRA PAYMENTS */
+  .extra-section { background: rgba(199,125,255,0.05); border: 1px solid rgba(199,125,255,0.2); border-radius: 6px; padding: 9px; display: flex; flex-direction: column; gap: 6px; }
+  .extra-section-title { font-size: 0.59rem; letter-spacing: 1.5px; text-transform: uppercase; color: var(--purple); }
+  .extra-payments-list { display: flex; flex-direction: column; gap: 5px; }
+
+  .extra-payment-row { background: rgba(255,255,255,0.02); border: 1px solid rgba(199,125,255,0.13); border-radius: 5px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .extra-row-top { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 5px; align-items: end; }
+  .extra-row-bottom { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
+  .extra-payment-row input[type="text"], .extra-payment-row select { font-size: 0.73rem; padding: 5px 6px; }
+
+  /* inflation toggle on extra */
+  .infl-toggle-wrap { display: flex; align-items: center; gap: 6px; }
+  .infl-toggle-label { font-size: 0.58rem; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); }
+  .mini-toggle { position: relative; width: 30px; height: 16px; cursor: pointer; flex-shrink: 0; }
+  .mini-toggle input { opacity: 0; width: 0; height: 0; }
+  .mini-track { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; transition: all 0.2s; }
+  .mini-track:before { content: ''; position: absolute; height: 10px; width: 10px; left: 2px; top: 2px; background: var(--muted); border-radius: 50%; transition: all 0.2s; }
+  .mini-toggle input:checked + .mini-track { background: rgba(199,125,255,0.2); border-color: var(--purple); }
+  .mini-toggle input:checked + .mini-track:before { transform: translateX(14px); background: var(--purple); }
+  .infl-badge { font-size: 0.57rem; color: var(--purple); opacity: 0.7; }
+
+  .add-extra-btn { background: rgba(199,125,255,0.07); border: 1px dashed rgba(199,125,255,0.32); color: var(--purple); font-family: 'IBM Plex Mono', monospace; font-size: 0.67rem; letter-spacing: 1px; text-transform: uppercase; padding: 6px; border-radius: 5px; cursor: pointer; transition: all 0.2s; width: 100%; }
+  .add-extra-btn:hover { background: rgba(199,125,255,0.13); border-style: solid; }
+  .remove-extra-btn { background: none; border: 1px solid rgba(255,107,107,0.24); color: var(--accent2); font-size: 0.68rem; padding: 4px 6px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+  .remove-extra-btn:hover { background: rgba(255,107,107,0.1); }
+
+  .transition-note { font-size: 0.6rem; color: var(--muted); background: rgba(255,209,102,0.06); border: 1px solid rgba(255,209,102,0.15); border-radius: 4px; padding: 5px 8px; margin-top: 2px; line-height: 1.5; }
+
+  .add-loan-btn { width: 100%; background: rgba(79,255,176,0.04); border: 1px dashed rgba(79,255,176,0.32); color: var(--accent); font-family: 'IBM Plex Mono', monospace; font-size: 0.74rem; letter-spacing: 1px; text-transform: uppercase; padding: 10px; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+  .add-loan-btn:hover { background: rgba(79,255,176,0.1); border-style: solid; }
+  .calc-btn { width: 100%; background: var(--accent); color: #0d0f14; font-family: 'Syne', sans-serif; font-size: 0.85rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding: 12px; border: none; border-radius: 6px; cursor: pointer; transition: all 0.15s; margin-top: 11px; }
+  .calc-btn:hover { background: #6fffbf; transform: translateY(-1px); }
+  .calc-btn:active { transform: translateY(0); }
+
+  /* RIGHT PANEL */
+  .results { padding: 22px 26px; overflow-y: auto; max-height: calc(100vh - 57px); background: var(--bg); }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .stat-card.savings-card { border-color: rgba(199,125,255,0.36); background: rgba(199,125,255,0.05); }
+  .stat-card.pv-card { border-color: rgba(255,159,67,0.28); background: rgba(255,159,67,0.04); }
+  .stat-card.equity-card { border-color: rgba(0,212,170,0.32); background: rgba(0,212,170,0.04); }
+  .stat-label { font-size: 0.57rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 1.18rem; font-weight: 800; letter-spacing: -0.5px; }
+  .stat-sub { font-size: 0.61rem; color: var(--muted); margin-top: 3px; }
+
+  .col-green { color: var(--accent); } .col-red { color: var(--accent2); } .col-yellow { color: var(--accent3); }
+  .col-blue { color: var(--verified); } .col-purple { color: var(--purple); } .col-orange { color: var(--orange); } .col-teal { color: var(--teal); }
+
+  .savings-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid rgba(199,125,255,0.15); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; }
+  .savings-row-label { font-size: 0.6rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .savings-bar-bg { flex: 1; background: var(--surface2); border-radius: 4px; height: 6px; overflow: hidden; }
+  .savings-bar-fill { height: 100%; border-radius: 4px; background: var(--purple); transition: width 0.8s cubic-bezier(.4,0,.2,1); }
+  .savings-pct { font-family: 'Syne', sans-serif; font-size: 0.9rem; font-weight: 800; color: var(--purple); white-space: nowrap; }
+
+  /* EQUITY */
+  .equity-section { background: var(--surface); border: 1px solid rgba(0,212,170,0.26); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .equity-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .equity-title { font-family: 'Syne', sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--teal); }
+  .equity-badges { display: flex; gap: 7px; }
+  .equity-badge { font-size: 0.58rem; padding: 2px 8px; border-radius: 4px; }
+  .equity-badge-prop { background: rgba(255,209,102,0.13); color: var(--accent3); border: 1px solid rgba(255,209,102,0.35); }
+  .equity-badge-loan { background: rgba(255,107,107,0.11); color: var(--accent2); border: 1px solid rgba(255,107,107,0.28); }
+  .equity-badge-eq { background: rgba(79,255,176,0.11); color: var(--accent); border: 1px solid rgba(79,255,176,0.28); }
+  .equity-badge-hms { background: rgba(255,107,107,0.11); color: var(--accent2); border: 1px solid rgba(255,107,107,0.28); }
+  /* HMS repayment marker in equity chart */
+  .hms-marker-label { font-size: 0.62rem; color: var(--accent2); font-family: 'IBM Plex Mono', monospace; }
+  .equity-gauge-wrap { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .equity-gauge { position: relative; width: 110px; height: 55px; flex-shrink: 0; }
+  .equity-gauge-pct { font-family: 'Syne', sans-serif; font-size: 1.7rem; font-weight: 800; color: var(--accent); line-height: 1; }
+  .equity-gauge-text { font-size: 0.62rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+
+  .chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+  .chart-title { font-family: 'Syne', sans-serif; font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+  canvas { max-height: 220px; }
+
+  /* TABLE */
+  .table-wrapper { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+  .table-header { display: flex; align-items: center; justify-content: space-between; padding: 11px 15px; border-bottom: 1px solid var(--border); gap: 8px; flex-wrap: wrap; }
+  .table-title { font-family: 'Syne', sans-serif; font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  .loan-selector { display: flex; gap: 4px; flex-wrap: wrap; }
+  .loan-tab { font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem; background: none; border: 1px solid var(--border); color: var(--muted); padding: 3px 8px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+  .loan-tab.active { background: var(--accent); color: #0d0f14; border-color: var(--accent); font-weight: 700; }
+  .loan-tab:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+  .amort-table { width: 100%; border-collapse: collapse; font-size: 0.69rem; }
+  .amort-table th { text-align: right; padding: 8px 10px; font-size: 0.56rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); white-space: nowrap; }
+  .amort-table th:first-child { text-align: left; }
+  .amort-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid rgba(42,48,69,0.38); white-space: nowrap; }
+  .amort-table td:first-child { text-align: left; color: var(--muted); }
+  .amort-table tr:last-child td { border-bottom: none; }
+  .amort-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .amort-table tr.has-extra td { background: rgba(199,125,255,0.04); }
+  .amort-table tr.has-extra td:first-child { color: var(--purple); }
+
+  /* INLINE EDIT CELL */
+  .extra-cell { position: relative; }
+  .extra-inline {
+    background: rgba(199,125,255,0.08); border: 1px solid rgba(199,125,255,0.25);
+    color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem;
+    padding: 3px 6px; border-radius: 4px; width: 90px; text-align: right; outline: none;
+    transition: border-color 0.15s;
+  }
+  .extra-inline:focus { border-color: var(--purple); background: rgba(199,125,255,0.14); }
+  .extra-inline.changed { border-color: var(--purple); color: var(--purple); }
+  .extra-inline-placeholder { color: var(--muted); font-size: 0.65rem; cursor: pointer; padding: 3px 6px; border: 1px dashed rgba(199,125,255,0.2); border-radius: 4px; display: inline-block; min-width: 60px; text-align: right; }
+  .extra-inline-placeholder:hover { border-color: rgba(199,125,255,0.5); color: var(--purple); }
+
+  .show-more-btn { width: 100%; background: none; border: none; border-top: 1px solid var(--border); color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 0.67rem; letter-spacing: 1px; text-transform: uppercase; padding: 10px; cursor: pointer; transition: color 0.2s, background 0.2s; }
+  .show-more-btn:hover { color: var(--accent); background: rgba(79,255,176,0.04); }
+
+  .table-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .view-mode-toggle { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+  .view-mode-btn {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.64rem; letter-spacing: 0.3px;
+    background: none; border: none; border-right: 1px solid var(--border);
+    color: var(--muted); padding: 4px 10px; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .view-mode-btn:last-child { border-right: none; }
+  .view-mode-btn.active { background: rgba(79,255,176,0.12); color: var(--accent); font-weight: 600; }
+  .view-mode-btn:hover:not(.active) { background: rgba(255,255,255,0.04); color: var(--text); }
+
+  .excel-btn-bottom {
+    width: 100%; background: none; border: none; border-top: 1px solid var(--border);
+    color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 0.67rem;
+    letter-spacing: 1px; text-transform: uppercase; padding: 10px; cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+  }
+  .excel-btn-bottom:hover { color: var(--accent); background: rgba(79,255,176,0.04); }
+
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 400px; gap: 12px; color: var(--muted); }
+  .empty-icon { font-size: 3rem; opacity: 0.35; }
+  .empty-text { font-size: 0.74rem; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* PURCHASING POWER */
+  #ppPanel { background: var(--surface); border: 1px solid rgba(79,255,176,0.22); border-radius: 8px; overflow: hidden; }
+  .pp-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; cursor: pointer; user-select: none; transition: background 0.15s; }
+  .pp-toggle-row:hover { background: rgba(255,255,255,0.02); }
+  .pp-title { font-family: 'Syne', sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
+  .pp-chevron { color: var(--muted); font-size: 0.74rem; transition: transform 0.2s; }
+  #ppBody { padding: 0 16px 16px; }
+  .pp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .pp-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 11px 12px; }
+  .pp-dp-pct { font-size: 0.6rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .pp-prop-val { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 800; color: var(--accent); letter-spacing: -0.5px; margin-bottom: 3px; }
+  .pp-sub { font-size: 0.6rem; color: var(--muted); margin-bottom: 7px; }
+  .pp-bar-bg { background: var(--bg); border-radius: 3px; height: 4px; overflow: hidden; }
+  .pp-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--verified)); transition: width 0.6s ease; }
+
+  /* PP year selector */
+  .pp-year-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .pp-year-label { font-size: 0.62rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .pp-year-controls { display: flex; align-items: center; gap: 6px; }
+  .pp-year-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; padding: 3px 8px;
+    border-radius: 4px; cursor: pointer; transition: all 0.15s; line-height: 1;
+  }
+  .pp-year-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,255,176,0.08); }
+  .pp-year-val {
+    font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800;
+    color: var(--accent); min-width: 28px; text-align: center;
+  }
+  .pp-slider {
+    flex: 1; min-width: 120px; -webkit-appearance: none; appearance: none;
+    height: 4px; border-radius: 2px; background: var(--border); outline: none; cursor: pointer;
+  }
+  .pp-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: 2px solid var(--bg);
+  }
+  .pp-slider::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: 2px solid var(--bg);
+  }
+  .pp-desc {
+    font-size: 0.62rem; color: var(--muted); line-height: 1.6;
+    margin-bottom: 12px; padding: 6px 10px;
+    background: rgba(255,255,255,0.02); border-radius: 4px; border: 1px solid var(--border);
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Vöx<span>tun</span></h1>
+  <span class="header-tag">Spálíkan · Annuitet · Aukagreiðslur · Núvirðing · Eign</span>
+</header>
+
+<div class="main">
+  <div class="panel">
+    <div class="property-panel">
+      <div class="property-toggle-row">
+        <span class="property-toggle-title">🏠 Fasteignamat</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="propToggle" onchange="togglePropFields()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="property-fields" id="propFields" style="display:none">
+        <div class="field">
+          <label>Markaðsvirði fasteignar í dag (kr.)</label>
+          <input type="text" id="propValue" value="85.000.000" placeholder="85.000.000">
+        </div>
+        <div class="property-note">
+          Fasteignin hækkar árlega með verðbólguspá. Eignarhlutfall = markaðsvirði − eftirstöðvar lána.
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Lán</div>
+    <div class="loans-container" id="loansContainer"></div>
+    <button class="add-loan-btn" onclick="addLoan()">+ Bæta við láni</button>
+    <button class="calc-btn" onclick="calculate()">Reikna</button>
+  </div>
+
+  <div class="results" id="results">
+    <div class="empty-state">
+      <div class="empty-icon">⌁</div>
+      <div class="empty-text">Settu inn lán og ýttu á Reikna</div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let loanCounter = 0, extraCounter = 0;
+let loans = [];
+let charts = {};
+let tableShowAll = {};
+let tableViewMode = 'single';
+let tableActiveLoanIdx = 0;
+let _ppSeriesData = [];
+let _ppDpPctsData = [10, 20, 30, 40, 50];
+// Per-loan inline override: { [loanId]: { [year]: amount } }
+let inlineOverrides = {};
+// Store last results for re-render on inline edit
+let lastResults = [], lastBaselines = [], lastUseProp = false, lastPropVal = 0;
+
+const COLORS = ['#4fffb0','#3bb8ff','#ffd166','#ff6b6b','#c77dff'];
+
+// ── NUMBER PARSING ────────────────────────────────────────────────────────────
+// Accept both comma and dot as decimal separator; strip thousands separators
+
+function parseNum(str) {
+  if (str === null || str === undefined) return NaN;
+  const s = String(str).trim();
+  if (s === '' || s === '-') return NaN;
+  // Remove all spaces and non-breaking spaces
+  let clean = s.replace(/[\s\u00a0]/g, '');
+  // Detect format: if both . and , present, last one is decimal
+  const lastDot = clean.lastIndexOf('.');
+  const lastComma = clean.lastIndexOf(',');
+  if (lastDot !== -1 && lastComma !== -1) {
+    if (lastComma > lastDot) {
+      // 1.234,56 → European format
+      clean = clean.replace(/\./g, '').replace(',', '.');
+    } else {
+      // 1,234.56 → American format
+      clean = clean.replace(/,/g, '');
+    }
+  } else if (lastComma !== -1) {
+    // Check if comma is thousands separator: e.g. 1,000 vs 1,5
+    const afterComma = clean.substring(lastComma + 1);
+    if (afterComma.length === 3 && !afterComma.includes(',')) {
+      // Likely thousands separator
+      clean = clean.replace(/,/g, '');
+    } else {
+      clean = clean.replace(',', '.');
+    }
+  }
+  return parseFloat(clean);
+}
+
+function getVal(id) {
+  const el = document.getElementById(id);
+  if (!el) return 0;
+  const v = parseNum(el.value);
+  return isNaN(v) ? 0 : v;
+}
+
+function validateInput(el) {
+  const v = parseNum(el.value);
+  if (el.value.trim() !== '' && isNaN(v)) {
+    el.classList.add('invalid');
+  } else {
+    el.classList.remove('invalid');
+  }
+}
+
+// ── FORMAT HELPERS ────────────────────────────────────────────────────────────
+function fmt(n) { return Math.round(n).toLocaleString('is-IS') + ' kr.'; }
+function fmtPct(n) { return n.toLocaleString('is-IS', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + '%'; }
+function fmtNum(n) { return Math.round(n).toLocaleString('is-IS'); }
+
+// ── PROPERTY ─────────────────────────────────────────────────────────────────
+function togglePropFields() {
+  document.getElementById('propFields').style.display =
+    document.getElementById('propToggle').checked ? '' : 'none';
+}
+
+// ── LOAN CARD ────────────────────────────────────────────────────────────────
+function addLoan() {
+  const id = ++loanCounter;
+  const color = COLORS[(id-1) % COLORS.length];
+  loans.push({ id });
+  inlineOverrides[id] = {};
+
+  const card = document.createElement('div');
+  card.className = 'loan-card';
+  card.id = `loan-${id}`;
+  card.innerHTML = `
+    <div class="loan-header" onclick="toggleLoan(${id})">
+      <div class="loan-header-left">
+        <span class="loan-num" style="color:${color};background:${color}22;border:1px solid ${color}55">Lán ${id}</span>
+        <span class="loan-type-badge badge-vt" id="badge-type-${id}">Verðtryggt</span>
+        <span class="loan-type-badge badge-jafnar" id="badge-method-${id}">Jafnar afb.</span>
+      </div>
+      <div class="loan-header-right">
+        <button class="remove-btn" onclick="removeLoan(event,${id})">✕</button>
+        <span class="chevron open" id="chevron-${id}">▼</span>
+      </div>
+    </div>
+    <div class="loan-body open" id="body-${id}">
+      <div class="field-row">
+        <div class="field">
+          <label>Tegund láns</label>
+          <select id="type-${id}" onchange="updateBadge(${id})">
+            <option value="vt">Verðtryggt</option>
+            <option value="ovt">Óverðtryggt</option>
+            <option value="hms">HMS Hlutdeildarlán</option>
+          </select>
+        </div>
+        <div class="field" id="years-wrap-${id}">
+          <label>Lánstími</label>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center">
+            <input type="text" id="years-${id}" value="25" oninput="validateInput(this)">
+            <div class="method-toggle" style="width:auto;min-width:80px">
+              <button class="method-btn active-jafnar" id="yunit-yr-${id}" onclick="setYearUnit(${id},'yr')" style="font-size:0.65rem;padding:7px 8px">Ár</button>
+              <button class="method-btn" id="yunit-mo-${id}" onclick="setYearUnit(${id},'mo')" style="font-size:0.65rem;padding:7px 8px">Mán.</button>
+            </div>
+          </div>
+          <input type="hidden" id="yunit-${id}" value="yr">
+        </div>
+      </div>
+      <div class="field">
+        <label>Upphafsupphæð (kr.)</label>
+        <input type="text" id="amount-${id}" value="50.000.000" oninput="validateInput(this)">
+      </div>
+      <div class="field" id="method-wrap-${id}">
+        <label>Greiðslumáti</label>
+        <div class="method-toggle">
+          <button class="method-btn active-jafnar" id="mbtn-jafnar-${id}" onclick="setMethod(${id},'jafnar')">Jafnar afborganir</button>
+          <button class="method-btn" id="mbtn-annuitet-${id}" onclick="setMethod(${id},'annuitet')">Jafnar greiðslur</button>
+        </div>
+        <input type="hidden" id="method-${id}" value="jafnar">
+        <div class="method-note" id="method-note-${id}">Jafnar afborganir: sömu afborgun á hverju ári, vextir lækka með höfuðstól.</div>
+      </div>
+      <!-- HMS info block -->
+      <div id="hms-info-${id}" style="display:none">
+        <div class="method-note" style="background:rgba(255,107,107,0.06);border-color:rgba(255,107,107,0.2);color:var(--muted);line-height:1.6">
+          <strong style="color:var(--accent2)">HMS Hlutdeildarlán</strong><br>
+          Engir vextir eða afborganir. Höfuðstóll fylgir verðþróun fasteignarinnar (sama hlutfall af markaðsvirði). Endurgreitt í einu lagi við sölu eða lok lánstíma.<br>
+          <span style="color:var(--accent2)">Lánstími: 10 ár (framlengist um 5 ár í senn, mest 25 ár).</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field-section" id="rate-section-${id}">Núverandi skilmálar</div>
+      <div id="normal-rate-fields-${id}">
+      <div class="field-row">
+        <div class="field">
+          <label>Núv. vextir (%)</label>
+          <input type="text" id="rate-${id}" value="9,5" oninput="validateInput(this)">
+        </div>
+        <div class="field" id="inf-field-${id}">
+          <label>Núv. verðbólga (%)</label>
+          <input type="text" id="inflation-${id}" value="5,5" oninput="validateInput(this)">
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field-section">Spá — meðaltal lánstíma</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Meðalvextir (%)</label>
+          <input type="text" id="avgRate-${id}" value="6,5" oninput="validateInput(this)">
+        </div>
+        <div class="field" id="avgInf-field-${id}">
+          <label>Meðalverðbólga (%)</label>
+          <input type="text" id="avgInflation-${id}" value="3,5" oninput="validateInput(this)">
+        </div>
+      </div>
+      <div class="field">
+        <label>Umskiptatími (ár)</label>
+        <input type="text" id="transition-${id}" value="3" oninput="validateInput(this);updateTransNote(${id})">
+        <div class="transition-note">
+          Ár 1–<span id="tyr-${id}">3</span>: línuleg breyting → meðaltal.
+          Frá ári <span id="tyr2-${id}">4</span>: fastur meðalvexti/verðbólga.
+        </div>
+      </div>
+      </div><!-- end normal-rate-fields -->
+      <!-- HMS: only needs inflation forecast for property growth -->
+      <div id="hms-rate-fields-${id}" style="display:none">
+      <div class="field-row">
+        <div class="field">
+          <label>Núv. verðbólga (%)</label>
+          <input type="text" id="hms-inflation-${id}" value="5,5" oninput="validateInput(this)">
+        </div>
+        <div class="field">
+          <label>Meðalverðbólga lánstíma (%)</label>
+          <input type="text" id="hms-avgInflation-${id}" value="3,5" oninput="validateInput(this)">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Hlutfall af kaupverði (%)</label>
+          <input type="text" id="hms-pct-${id}" value="20" oninput="validateInput(this)">
+        </div>
+        <div class="field">
+          <label>Umskiptatími verðbólgu (ár)</label>
+          <input type="text" id="hms-transition-${id}" value="3" oninput="validateInput(this)">
+        </div>
+      </div>
+      </div><!-- end hms-rate-fields -->
+      <div class="divider"></div>
+      <div class="extra-section">
+        <div class="extra-section-title">⚡ Aukagreiðslur á þetta lán</div>
+        <div class="extra-payments-list" id="extraList-${id}"></div>
+        <button class="add-extra-btn" onclick="addExtra(${id})">+ Bæta við aukagreiðslu</button>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <label>Afgreiðslugjald banka (kr./mán.)</label>
+        <input type="text" id="fee-${id}" value="500" oninput="validateInput(this)">
+      </div>
+    </div>`;
+  document.getElementById('loansContainer').appendChild(card);
+  updateBadge(id);
+}
+
+function updateTransNote(id) {
+  const v = Math.round(getVal(`transition-${id}`)) || 3;
+  document.getElementById(`tyr-${id}`).textContent = v;
+  document.getElementById(`tyr2-${id}`).textContent = v + 1;
+}
+
+function setYearUnit(id, unit) {
+  document.getElementById(`yunit-${id}`).value = unit;
+  document.getElementById(`yunit-yr-${id}`).className = 'method-btn' + (unit === 'yr' ? ' active-jafnar' : '');
+  document.getElementById(`yunit-mo-${id}`).className = 'method-btn' + (unit === 'mo' ? ' active-jafnar' : '');
+  // Hint: convert current value
+  const cur = parseNum(document.getElementById(`years-${id}`).value) || 0;
+  if (unit === 'mo' && cur > 0 && cur <= 40) {
+    document.getElementById(`years-${id}`).value = Math.round(cur * 12);
+  } else if (unit === 'yr' && cur > 40) {
+    document.getElementById(`years-${id}`).value = Math.round(cur / 12);
+  }
+}
+
+function setMethod(id, m) {
+  document.getElementById(`method-${id}`).value = m;
+  const isJ = m === 'jafnar';
+  document.getElementById(`mbtn-jafnar-${id}`).className = 'method-btn' + (isJ ? ' active-jafnar' : '');
+  document.getElementById(`mbtn-annuitet-${id}`).className = 'method-btn' + (!isJ ? ' active-annuitet' : '');
+  const b = document.getElementById(`badge-method-${id}`);
+  b.textContent = isJ ? 'Jafnar afb.' : 'Annuitet';
+  b.className = 'loan-type-badge ' + (isJ ? 'badge-jafnar' : 'badge-annuitet');
+  document.getElementById(`method-note-${id}`).textContent = isJ
+    ? 'Jafnar afborganir: sömu afborgun á hverju ári, vextir lækka með höfuðstól.'
+    : 'Jafnar greiðslur (annuitet): sömu heildargreiðsla á hverju ári, hlutfall vaxta/afborgunar breytist.';
+}
+
+function updateBadge(id) {
+  const type = document.getElementById(`type-${id}`).value;
+  const isVT = type === 'vt';
+  const isHMS = type === 'hms';
+
+  // Show/hide field groups
+  document.getElementById(`method-wrap-${id}`).style.display = isHMS ? 'none' : '';
+  document.getElementById(`hms-info-${id}`).style.display = isHMS ? '' : 'none';
+  document.getElementById(`normal-rate-fields-${id}`).style.display = isHMS ? 'none' : '';
+  document.getElementById(`hms-rate-fields-${id}`).style.display = isHMS ? '' : 'none';
+  document.getElementById(`years-wrap-${id}`).style.display = isHMS ? 'none' : '';
+
+  // For verðtryggt show inflation fields
+  if (!isHMS) {
+    document.getElementById(`inf-field-${id}`).style.display = isVT ? '' : 'none';
+    document.getElementById(`avgInf-field-${id}`).style.display = isVT ? '' : 'none';
+  }
+
+  const b = document.getElementById(`badge-type-${id}`);
+  const bm = document.getElementById(`badge-method-${id}`);
+  if (isHMS) {
+    b.textContent = 'HMS Hlutdeild'; b.className = 'loan-type-badge badge-hms';
+    bm.textContent = 'Engar greiðslur'; bm.className = 'loan-type-badge badge-hms';
+  } else {
+    b.textContent = isVT ? 'Verðtryggt' : 'Óverðtryggt';
+    b.className = 'loan-type-badge ' + (isVT ? 'badge-vt' : 'badge-ovt');
+    // method badge stays as-is
+  }
+}
+
+function toggleLoan(id) {
+  const body = document.getElementById(`body-${id}`);
+  const chev = document.getElementById(`chevron-${id}`);
+  chev.classList.toggle('open', body.classList.toggle('open'));
+}
+
+function removeLoan(e, id) {
+  e.stopPropagation();
+  document.getElementById(`loan-${id}`).remove();
+  loans = loans.filter(l => l.id !== id);
+  delete inlineOverrides[id];
+}
+
+// ── EXTRA PAYMENTS ───────────────────────────────────────────────────────────
+function addExtra(loanId) {
+  const eid = ++extraCounter;
+  const row = document.createElement('div');
+  row.className = 'extra-payment-row';
+  row.id = `extra-${eid}`;
+  row.innerHTML = `
+    <div class="extra-row-top">
+      <div class="field" style="gap:3px">
+        <label style="font-size:0.56rem">Tegund</label>
+        <select id="eType-${eid}" onchange="toggleExtraYear(${eid})">
+          <option value="monthly">Mánaðarlegt</option>
+          <option value="once">Eingreiðsla</option>
+        </select>
+      </div>
+      <div class="field" style="gap:3px">
+        <label style="font-size:0.56rem" id="eAmtLbl-${eid}">Upphæð/mán.</label>
+        <input type="text" id="eAmt-${eid}" placeholder="50.000" oninput="validateInput(this)">
+      </div>
+      <div class="field" style="gap:3px;display:none" id="eYearWrap-${eid}">
+        <label style="font-size:0.56rem">Ár</label>
+        <input type="text" id="eYear-${eid}" value="1" oninput="validateInput(this)">
+      </div>
+      <button class="remove-extra-btn" onclick="removeExtra(${eid})">✕</button>
+    </div>
+    <div class="extra-row-bottom" id="eInflRow-${eid}">
+      <label class="mini-toggle">
+        <input type="checkbox" id="eInfl-${eid}">
+        <span class="mini-track"></span>
+      </label>
+      <span class="infl-toggle-label">Hækka með verðbólgu</span>
+      <span class="infl-badge" id="eInflBadge-${eid}"></span>
+    </div>`;
+  document.getElementById(`extraList-${loanId}`).appendChild(row);
+  // Update badge when toggle flips
+  document.getElementById(`eInfl-${eid}`).addEventListener('change', () => {
+    const on = document.getElementById(`eInfl-${eid}`).checked;
+    document.getElementById(`eInflBadge-${eid}`).textContent = on ? '↑ verðbólga' : '';
+  });
+}
+
+function toggleExtraYear(eid) {
+  const once = document.getElementById(`eType-${eid}`).value === 'once';
+  document.getElementById(`eYearWrap-${eid}`).style.display = once ? '' : 'none';
+  document.getElementById(`eAmtLbl-${eid}`).textContent = once ? 'Upphæð (kr.)' : 'Upphæð/mán.';
+  // Hide inflation toggle for one-time payments
+  document.getElementById(`eInflRow-${eid}`).style.display = once ? 'none' : '';
+}
+
+function removeExtra(eid) { document.getElementById(`extra-${eid}`)?.remove(); }
+
+function getExtras(loanId) {
+  return Array.from(document.getElementById(`extraList-${loanId}`).querySelectorAll('.extra-payment-row'))
+    .map(row => {
+      const eid = row.id.replace('extra-', '');
+      const type = document.getElementById(`eType-${eid}`).value;
+      const amt = parseNum(document.getElementById(`eAmt-${eid}`).value) || 0;
+      const year = Math.round(parseNum(document.getElementById(`eYear-${eid}`)?.value) || 1);
+      const inflAdj = type === 'monthly' ? document.getElementById(`eInfl-${eid}`).checked : false;
+      return amt > 0 ? { type, amt, year, inflAdj } : null;
+    }).filter(Boolean);
+}
+
+// ── INTERPOLATION ────────────────────────────────────────────────────────────
+function interp(cur, avg, trans, yr) {
+  if (yr <= trans) {
+    const t = trans <= 1 ? 1 : (yr - 1) / (trans - 1);
+    return cur + (avg - cur) * t;
+  }
+  return avg;
+}
+
+function annuitetPayment(bal, r, n) {
+  if (r === 0) return bal / n;
+  return bal * r / (1 - Math.pow(1 + r, -n));
+}
+
+function calcHMSLoan({ amount, years, hmsPct, currentInflation, avgInflation, transitionYears }) {
+  const schedule = [];
+  let cumInflFactor = 1.0;
+
+  // Year 0 — upphafsstaða
+  schedule.push({
+    year: 0, rate: 0, infl: currentInflation,
+    balance: Math.round(amount), balanceAfter: Math.round(amount),
+    principal: 0, extraPrincipal: 0, interest: 0, inflAdd: 0,
+    payment: 0, monthlyPayment: 0, pvPayment: 0, pvMonthly: 0,
+    pvBalance: Math.round(amount), hasExtra: false, cumInflFactor: 1,
+    isYear0: true,
+  });
+
+  for (let y = 1; y <= years; y++) {
+    const inflPV = interp(currentInflation, avgInflation, transitionYears, y) / 100;
+    cumInflFactor *= (1 + inflPV);
+    const balance = Math.round(amount * cumInflFactor);
+
+    schedule.push({
+      year: y, rate: 0, infl: inflPV * 100,
+      balance, balanceAfter: balance,
+      principal: 0, extraPrincipal: 0, interest: 0, inflAdd: 0,
+      payment: 0, monthlyPayment: 0, pvPayment: 0, pvMonthly: 0,
+      pvBalance: Math.round(amount),
+      hasExtra: false, cumInflFactor,
+    });
+  }
+
+  return {
+    schedule,
+    totInt: 0, totInfl: 0, totExtra: 0, totPay: 0,
+    actualYears: years,
+    avgMonthly: 0, pvTotalPay: 0, pvAvgMonthly: 0,
+    isHMS: true,
+  };
+}
+
+// ── CALC LOAN ────────────────────────────────────────────────────────────────
+function calcLoan({ amount, years, type, currentRate, avgRate, currentInflation, avgInflation,
+                    transitionYears, method, extras, inlineOvr, monthlyFee }) {
+  let bal = amount;
+  const schedule = [];
+  let totInt = 0, totInfl = 0, totExtra = 0, totPay = 0, totFees = 0;
+  const annualFee = (monthlyFee || 0) * 12;
+
+  // Year 0 — upphafsstaða
+  schedule.push({
+    year: 0, rate: currentRate, infl: type === 'vt' ? currentInflation : 0,
+    balance: Math.round(amount), principal: 0, extraPrincipal: 0,
+    interest: 0, inflAdd: 0, fee: 0, payment: 0, monthlyPayment: 0,
+    balanceAfter: Math.round(amount), pvPayment: 0, pvMonthly: 0,
+    pvBalance: Math.round(amount), pvPrincipalRow: 0,
+    hasExtra: false, cumInflFactor: 1, hasOverride: false, isYear0: true,
+  });
+
+  // Build monthly extra base amounts (will be adjusted for inflation if inflAdj)
+  const monthlyExtras = extras.filter(e => e.type === 'monthly');
+  const onceMap = {};
+  extras.filter(e => e.type === 'once').forEach(e => {
+    onceMap[e.year] = (onceMap[e.year] || 0) + e.amt;
+  });
+
+  let cumInflFactor = 1.0;
+  let actualYears = years;
+
+  for (let y = 1; y <= years; y++) {
+    if (bal <= 0) { actualYears = y - 1; break; }
+
+    const rate    = interp(currentRate, avgRate, transitionYears, y) / 100;
+    const infl    = type === 'vt' ? interp(currentInflation, avgInflation, transitionYears, y) / 100 : 0;
+    const inflPV  = interp(currentInflation, avgInflation, transitionYears, y) / 100;
+
+    const inflAdd = bal * infl;
+    bal += inflAdd;
+
+    let principal, interest, payment;
+    if (method === 'annuitet') {
+      const remaining = years - y + 1;
+      payment  = annuitetPayment(bal, rate, remaining);
+      interest = bal * rate;
+      principal = payment - interest;
+      if (principal > bal) { principal = bal; payment = principal + interest; }
+    } else {
+      principal = bal / (years - y + 1);
+      interest  = bal * rate;
+      payment   = principal + interest;
+    }
+
+    // Monthly extras — adjust for inflation if flagged
+    let monthlyExtraTotal = monthlyExtras.reduce((s, e) => {
+      if (e.inflAdj) {
+        // Grow by cumInflFactor relative to year 1
+        return s + e.amt * cumInflFactor;
+      }
+      return s + e.amt;
+    }, 0);
+
+    // Inline override for this year (from table editing) — overrides monthly extras if set
+    const override = inlineOvr && inlineOvr[y] !== undefined ? inlineOvr[y] : null;
+
+    let extraThisYear;
+    if (override !== null) {
+      // Annual override divided by 12 is monthly but we store annual here
+      extraThisYear = Math.max(0, Math.min(override, bal - principal));
+    } else {
+      extraThisYear = Math.max(0, Math.min(
+        monthlyExtraTotal * 12 + (onceMap[y] || 0),
+        bal - principal
+      ));
+    }
+
+    const totalPrin   = principal + extraThisYear;
+    const totalPayment = totalPrin + interest + annualFee;
+
+    totInt   += interest;
+    totInfl  += inflAdd;
+    totExtra += extraThisYear;
+    totFees  += annualFee;
+    totPay   += totalPayment;
+
+    cumInflFactor *= (1 + inflPV);
+    const pvPayment = totalPayment / cumInflFactor;
+    const balAfter  = Math.max(0, bal - totalPrin);
+
+    schedule.push({
+      year: y,
+      rate: rate * 100, infl: infl * 100,
+      balance: Math.round(bal),
+      principal: Math.round(principal),
+      extraPrincipal: Math.round(extraThisYear),
+      interest: Math.round(interest),
+      inflAdd: Math.round(inflAdd),
+      fee: Math.round(annualFee),
+      payment: Math.round(totalPayment),
+      monthlyPayment: Math.round(totalPayment / 12),
+      balanceAfter: Math.round(balAfter),
+      pvPayment: Math.round(pvPayment),
+      pvMonthly: Math.round(pvPayment / 12),
+      pvBalance: Math.round(balAfter / cumInflFactor),
+      pvPrincipalRow: Math.round((principal + extraThisYear) / cumInflFactor),
+      hasExtra: extraThisYear > 0,
+      cumInflFactor,
+      hasOverride: override !== null,
+    });
+
+    bal = balAfter;
+    if (bal <= 100) { actualYears = y; break; }
+  }
+
+  const avgMonthly   = totPay / (actualYears * 12);
+  const pvTotalPay   = schedule.reduce((s, r) => s + r.pvPayment, 0);
+  const pvAvgMonthly = pvTotalPay / (actualYears * 12);
+
+  return { schedule, totInt, totInfl, totExtra, totFees, totPay, actualYears, avgMonthly, pvTotalPay, pvAvgMonthly };
+}
+
+// ── EQUITY ───────────────────────────────────────────────────────────────────
+// HMS loan stays in totalDebt for the entire loan term — it is never "paid off"
+// during the simulation (repayment requires refinancing, not scheduled payments).
+// The equity figure = market value − all outstanding debt including HMS.
+function calcEquitySeries(results, propVal0, maxYears) {
+  let propVal = propVal0;
+
+  return Array.from({ length: maxYears }, (_, i) => {
+    const y = i + 1;
+
+    // Blended year-on-year inflation: use schedule.find to avoid index issues
+    let inflSum = 0, inflCount = 0;
+    results.forEach(r => {
+      const row = r.schedule.find(s => s.year === y);
+      const prev = r.schedule.find(s => s.year === y - 1);
+      if (row && prev) {
+        inflSum += (row.cumInflFactor / prev.cumInflFactor - 1) * 100;
+        inflCount++;
+      }
+    });
+    const blInfl = inflCount > 0 ? inflSum / inflCount : 0;
+    propVal *= (1 + blInfl / 100);
+
+    // Total debt: all loans still running at year y, including HMS
+    const totalDebt = results.reduce((s, r) => {
+      const row = r.schedule.find(s => s.year === y);
+      // If loan has ended (year > actualYears), debt = 0 for normal loans
+      // For HMS: always include until its loanstimi is up
+      if (!row) return s;
+      return s + row.balanceAfter;
+    }, 0);
+
+    const equity = propVal - totalDebt;
+    return {
+      year: y,
+      propVal: Math.round(propVal),
+      totalDebt: Math.round(totalDebt),
+      equity: Math.round(equity),
+      equityPct: propVal > 0 ? (equity / propVal) * 100 : 0,
+    };
+  });
+}
+
+// ── MAIN CALCULATE ────────────────────────────────────────────────────────────
+function getLoanParams(id) {
+  const type = document.getElementById(`type-${id}`).value;
+  const isHMS = type === 'hms';
+  return {
+    id,
+    type,
+    isHMS,
+    amount: getVal(`amount-${id}`),
+    years: (() => {
+      const isHMSType = document.getElementById(`type-${id}`).value === 'hms';
+      if (isHMSType) return 25; // HMS lánstími notaður til að passa við aðallánið
+      const unit = document.getElementById(`yunit-${id}`)?.value || 'yr';
+      const raw = Math.round(getVal(`years-${id}`)) || (unit === 'mo' ? 300 : 25);
+      return unit === 'mo' ? Math.round(raw / 12) || 1 : raw;
+    })(),
+    currentRate: isHMS ? 0 : getVal(`rate-${id}`),
+    avgRate: isHMS ? 0 : getVal(`avgRate-${id}`),
+    currentInflation: isHMS ? getVal(`hms-inflation-${id}`) : getVal(`inflation-${id}`),
+    avgInflation: isHMS ? getVal(`hms-avgInflation-${id}`) : getVal(`avgInflation-${id}`),
+    transitionYears: isHMS ? (Math.round(getVal(`hms-transition-${id}`)) || 3) : (Math.round(getVal(`transition-${id}`)) || 3),
+    method: isHMS ? 'hms' : document.getElementById(`method-${id}`).value,
+    extras: isHMS ? [] : getExtras(id),
+    hmsPct: isHMS ? (getVal(`hms-pct-${id}`) || 20) : 0,
+    monthlyFee: getVal(`fee-${id}`) || 0,
+  };
+}
+
+function calculate() {
+  const cards = document.querySelectorAll('.loan-card');
+  if (!cards.length) { alert('Bættu við a.m.k. einu láni.'); return; }
+
+  // Reset inline overrides when recalculating fresh
+  cards.forEach(card => {
+    const id = parseInt(card.id.replace('loan-', ''));
+    inlineOverrides[id] = {};
+  });
+
+  const results = [], baselines = [];
+  cards.forEach(card => {
+    const id = parseInt(card.id.replace('loan-', ''));
+    const p = getLoanParams(id);
+    if (p.isHMS) {
+      const res = calcHMSLoan(p);
+      results.push({ ...p, ...res });
+      baselines.push({ ...res }); // baseline same for HMS (no extras anyway)
+    } else {
+      const base = { ...p, inlineOvr: {} };
+      results.push({ ...p, ...calcLoan({ ...base, extras: p.extras, inlineOvr: {}, monthlyFee: p.monthlyFee }) });
+      baselines.push(calcLoan({ ...base, extras: [], inlineOvr: {}, monthlyFee: p.monthlyFee }));
+    }
+  });
+
+  const useProp = document.getElementById('propToggle').checked;
+  const propVal = useProp ? parseNum(document.getElementById('propValue').value) || 0 : 0;
+
+  lastResults = results; lastBaselines = baselines; lastUseProp = useProp; lastPropVal = propVal;
+  renderResults(results, baselines, useProp, propVal);
+}
+
+// Called after inline override change
+function recalcWithOverrides() {
+  const cards = document.querySelectorAll('.loan-card');
+  const results = [], baselines = [];
+  cards.forEach(card => {
+    const id = parseInt(card.id.replace('loan-', ''));
+    const p = getLoanParams(id);
+    if (p.isHMS) {
+      const res = calcHMSLoan(p);
+      results.push({ ...p, ...res });
+      baselines.push({ ...res });
+    } else {
+      const ovr = inlineOverrides[id] || {};
+      results.push({ ...p, ...calcLoan({ ...p, inlineOvr: ovr, monthlyFee: p.monthlyFee }) });
+      baselines.push(calcLoan({ ...p, extras: [], inlineOvr: {}, monthlyFee: p.monthlyFee }));
+    }
+  });
+  lastResults = results; lastBaselines = baselines;
+  rerenderChartsAndSummary(results, baselines, lastUseProp, lastPropVal);
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function renderResults(results, baselines, useProp, propVal0) {
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {}; tableShowAll = {};
+
+  const div = document.getElementById('results');
+  const maxYears = Math.max(...results.map(r => r.actualYears));
+  const equitySeries = useProp && propVal0 > 0 ? calcEquitySeries(results, propVal0, maxYears) : [];
+
+  div.innerHTML = buildResultsHTML(results, baselines, useProp, propVal0, equitySeries);
+
+  mountCharts(results, equitySeries, maxYears, useProp, propVal0);
+
+  const tabs = document.getElementById('loanTabs');
+  tableViewMode = 'single_annual'; tableActiveLoanIdx = 0;
+  results.forEach((r, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'loan-tab' + (i === 0 ? ' active' : '');
+    btn.textContent = `Lán ${r.id}`;
+    btn.onclick = () => {
+      document.querySelectorAll('.loan-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      tableActiveLoanIdx = i;
+      dispatchTableRender();
+    };
+    tabs.appendChild(btn);
+  });
+  dispatchTableRender();
+}
+
+function rerenderChartsAndSummary(results, baselines, useProp, propVal0) {
+  const maxYears = Math.max(...results.map(r => r.actualYears));
+  const equitySeries = useProp && propVal0 > 0 ? calcEquitySeries(results, propVal0, maxYears) : [];
+
+  // Update summary numbers in-place if possible, else full re-render
+  // For simplicity: full re-render but preserve scroll
+  const scr = document.getElementById('results').scrollTop;
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+  const div = document.getElementById('results');
+  div.innerHTML = buildResultsHTML(results, baselines, useProp, propVal0, equitySeries);
+  mountCharts(results, equitySeries, maxYears, useProp, propVal0);
+
+  const tabs = document.getElementById('loanTabs');
+  results.forEach((r, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'loan-tab' + (i === tableActiveLoanIdx ? ' active' : '');
+    btn.textContent = `Lán ${r.id}`;
+    btn.onclick = () => {
+      document.querySelectorAll('.loan-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      tableActiveLoanIdx = i;
+      dispatchTableRender();
+    };
+    tabs.appendChild(btn);
+  });
+  // Restore toggle button states
+  const [sc, pd] = tableViewMode.split('_');
+  document.getElementById('vmBtn-single')?.classList.toggle('active', sc === 'single');
+  document.getElementById('vmBtn-all')?.classList.toggle('active', sc === 'all');
+  document.getElementById('vmBtn-annual')?.classList.toggle('active', pd !== 'monthly');
+  document.getElementById('vmBtn-monthly')?.classList.toggle('active', pd === 'monthly');
+  const tabsEl = document.getElementById('loanTabs');
+  if (tabsEl) tabsEl.style.display = sc === 'single' ? '' : 'none';
+  dispatchTableRender();
+  div.scrollTop = scr;
+}
+
+function buildResultsHTML(results, baselines, useProp, propVal0, equitySeries) {
+  const totalAmt     = results.reduce((s, r) => s + r.amount, 0);
+  const totalPay     = results.reduce((s, r) => s + r.totPay, 0);
+  const totalBasePay = baselines.reduce((s, r) => s + r.totPay, 0);
+  const totalInt     = results.reduce((s, r) => s + r.totInt, 0);
+  const totalInfl    = results.reduce((s, r) => s + r.totInfl, 0);
+  const savings      = totalBasePay - totalPay;
+  const hasSavings   = savings > 500;
+  const avgMonthly   = results.reduce((s, r) => s + r.avgMonthly, 0);
+  const firstMon = results.reduce((s, r) => {
+    const yr1 = r.schedule.find(row => row.year === 1);
+    return s + (yr1 ? yr1.monthlyPayment : 0);
+  }, 0);
+  const pvTotalPay   = results.reduce((s, r) => s + r.pvTotalPay, 0);
+
+  // PV of interest+verðbætur: sum pvPayment rows that correspond to interest portion
+  // We approximate: pvInterest = sum over all years of (interest_y + inflAdd_y) / cumInflFactor_y
+  const pvIntInfl = results.filter(r => !r.isHMS).reduce((s, r) => {
+    return s + r.schedule.reduce((ss, row) => ss + (row.interest + row.inflAdd) / row.cumInflFactor, 0);
+  }, 0);
+
+  // PV of principal repaid: each year's principal+extra cash outflow discounted back by cumInflFactor
+  // For verðtryggt: the nominal principal payment in year y is (principal+extra) kr. in year-y money
+  // → PV = (principal + extra) / cumInflFactor_y
+  // This correctly shows that paying 10.000 kr. in year 10 is worth less than 10.000 today
+  const pvPrincipal = results.filter(r => !r.isHMS).reduce((s, r) => {
+    return s + r.schedule.reduce((ss, row) => {
+      const nominalPrin = row.principal + row.extraPrincipal;
+      return ss + nominalPrin / row.cumInflFactor;
+    }, 0);
+  }, 0);
+
+  const totalFees    = results.filter(r => !r.isHMS).reduce((s, r) => s + (r.totFees || 0), 0);
+  const lastEq = equitySeries.length > 0 ? equitySeries[equitySeries.length-1] : null;
+  const curEq    = useProp && propVal0 > 0 ? propVal0 - totalAmt : 0;
+  const curEqPct = propVal0 > 0 ? (curEq / propVal0) * 100 : 0;
+
+  // Purchasing power panel: compute max property price per down-payment %
+  // Use blended avg inflation and avg rate from all non-HMS loans for affordability
+  const nonHMS = results.filter(r => !r.isHMS);
+  const blendedAvgRate = nonHMS.length > 0
+    ? nonHMS.reduce((s, r) => s + r.avgRate, 0) / nonHMS.length : 6.5;
+  const blendedAvgYears = nonHMS.length > 0
+    ? nonHMS.reduce((s, r) => s + r.years, 0) / nonHMS.length : 25;
+  // Max monthly payment capacity = current avg monthly (excl fees)
+  const monthlyCapacity = avgMonthly - totalFees / 12;
+
+  // Build per-year capacity series for PP panel
+  // For each year y, monthly capacity = monthly payments of all loans at year y (freed up if sold)
+  // We use: capacity = current loan payments at that year (what you're already paying)
+  // plus freed equity could be used as down payment
+  const maxYrsForPP = Math.max(...results.map(r => r.actualYears));
+  const ppYearSeries = [];
+  for (let y = 0; y <= maxYrsForPP; y++) {
+    // Monthly payment at year y across all non-HMS loans
+    const monPay = nonHMS.reduce((s, r) => {
+      const row = r.schedule.find(row2 => row2.year === y);
+      return s + (row ? row.monthlyPayment : 0);
+    }, 0);
+    const feeMon = nonHMS.reduce((s, r) => s + (r.monthlyFee || 0), 0);
+    // Rate and remaining years at this year (use blended)
+    const rateAtY = nonHMS.length > 0
+      ? nonHMS.reduce((s, r) => {
+          const row = r.schedule.find(row2 => row2.year === Math.max(y, 1));
+          return s + (row ? row.rate : r.avgRate);
+        }, 0) / nonHMS.length
+      : blendedAvgRate;
+    // Remaining loan term = avg remaining years
+    const remYears = nonHMS.length > 0
+      ? nonHMS.reduce((s, r) => s + Math.max(r.actualYears - y, 0), 0) / nonHMS.length
+      : blendedAvgYears;
+    ppYearSeries.push({ y, monPay, feeMon, rateAtY, remYears });
+  }
+  const ppSeriesJSON = JSON.stringify(ppYearSeries);
+  const dpPcts = [10, 20, 30, 40, 50];
+
+  // Initial display at year 0
+  const ppY0 = ppYearSeries[0];
+  const ppCapacity0 = ppY0 ? ppY0.monPay - ppY0.feeMon : monthlyCapacity;
+  const ppRate0 = ppY0 ? ppY0.rateAtY : blendedAvgRate;
+  const ppRemYrs0 = ppY0 ? ppY0.remYears : blendedAvgYears;
+  const ppCards0 = buildPPCards(ppCapacity0, ppRate0, ppRemYrs0, dpPcts);
+
+  // Store in module-level vars — safe from inline-script timing issues
+  _ppSeriesData = ppYearSeries;
+  _ppDpPctsData = dpPcts;
+  _ppCurrentYear = 0;
+
+  return `
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:14px">
+      <div class="section-title" style="margin:0">Niðurstöður</div>
+    </div>
+
+    <!-- PURCHASING POWER PANEL -->
+    <div id="ppPanel" style="margin-bottom:16px">
+      <div class="pp-toggle-row" onclick="togglePP()">
+        <span class="pp-title">💰 Kaupgeta — hversu dýra eign get ég keypt?</span>
+        <span class="pp-chevron" id="ppChevron">▼</span>
+      </div>
+      <div id="ppBody" style="display:none;margin-top:12px">
+
+        <div class="pp-year-row">
+          <span class="pp-year-label">Skoða kaupgetu á ári:</span>
+          <div class="pp-year-controls">
+            <button class="pp-year-btn" onclick="ppChangeYear(-1)">◀</button>
+            <span class="pp-year-val" id="ppYearVal">0</span>
+            <button class="pp-year-btn" onclick="ppChangeYear(1)">▶</button>
+          </div>
+          <input type="range" class="pp-slider" id="ppSlider"
+            min="0" max="${maxYrsForPP}" value="0"
+            oninput="ppSetYear(parseInt(this.value))">
+        </div>
+
+        <div class="pp-desc" id="ppDesc">
+          Ár 0 — núverandi greiðslugeta:
+          <strong style="color:var(--verified)">${fmt(Math.max(ppCapacity0, 0))}/mán.</strong>
+          við meðalvexti <strong style="color:var(--verified)">${fmtPct(ppRate0)}</strong>
+          og eftirstandandi lánstíma <strong style="color:var(--verified)">${Math.round(ppRemYrs0)} ár</strong>.
+        </div>
+
+        <div class="pp-grid" id="ppGrid">
+          ${ppCards0}
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="stat-card">
+        <div class="stat-label">Heildarupphæð lána</div>
+        <div class="stat-value col-green">${fmt(totalAmt)}</div>
+        <div class="stat-sub">${results.length} lán</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Meðalgreiðsla / mánuð</div>
+        <div class="stat-value col-blue">${fmt(avgMonthly)}</div>
+        <div class="stat-sub">1. ár: ${fmt(firstMon)}/mán.</div>
+      </div>
+      <div class="stat-card${hasSavings ? ' savings-card' : ''}">
+        <div class="stat-label">Heildargreiðslur</div>
+        <div class="stat-value ${hasSavings ? 'col-purple' : 'col-yellow'}">${fmt(totalPay)}</div>
+        <div class="stat-sub">${hasSavings ? '⚡ Sparnaður: ' + fmt(savings) : 'Engar aukagreiðslur'}</div>
+      </div>
+      <div class="stat-card pv-card">
+        <div class="stat-label">Núvirði heildargreiðslna</div>
+        <div class="stat-value col-orange">${fmt(pvTotalPay)}</div>
+        <div class="stat-sub">Afvöxtun: verðbólguspá</div>
+      </div>
+      <div class="stat-card pv-card">
+        <div class="stat-label">Núvirði vextir + verðbætur</div>
+        <div class="stat-value col-orange">${fmt(pvIntInfl)}</div>
+        <div class="stat-sub">Raunkostnaður fjármögnunar</div>
+      </div>
+      <div class="stat-card pv-card">
+        <div class="stat-label">Núvirði greidds höfuðstóls</div>
+        <div class="stat-value col-orange">${fmt(pvPrincipal)}</div>
+        <div class="stat-sub">Raunvirði afborgana í dag</div>
+      </div>
+      ${totalFees > 0 ? `
+      <div class="stat-card" style="border-color:rgba(107,118,148,0.4)">
+        <div class="stat-label">Heildar afgreiðslugjöld</div>
+        <div class="stat-value" style="color:var(--muted)">${fmt(totalFees)}</div>
+        <div class="stat-sub">${fmt(totalFees/Math.max(...results.filter(r=>!r.isHMS).map(r=>r.actualYears))/12)}/mán. að meðaltali</div>
+      </div>` : ''}
+      ${useProp && propVal0 > 0 ? `
+      <div class="stat-card equity-card">
+        <div class="stat-label">Eignarhlutfall í dag</div>
+        <div class="stat-value col-teal">${fmtPct(curEqPct)}</div>
+        <div class="stat-sub">${fmt(curEq)} eign</div>
+      </div>
+      <div class="stat-card equity-card">
+        <div class="stat-label">Markaðsvirði lok lánstíma</div>
+        <div class="stat-value col-teal">${lastEq ? fmt(lastEq.propVal) : '—'}</div>
+        <div class="stat-sub">Verðlag verðbólguspár</div>
+      </div>` : ''}
+      ${results.some(r => r.isHMS) ? `
+      <div class="stat-card" style="border-color:rgba(255,107,107,0.25);background:rgba(255,107,107,0.03)">
+        <div class="stat-label">HMS hlutdeildarlán</div>
+        <div class="stat-value col-red">${fmt(results.filter(r=>r.isHMS).reduce((s,r)=>s+r.amount,0))}</div>
+        <div class="stat-sub">Fylgir verðþróun eignar</div>
+      </div>` : ''}
+    </div>
+
+    ${hasSavings ? `
+    <div class="savings-row">
+      <span class="savings-row-label">Sparnaður aukagreiðslna</span>
+      <div class="savings-bar-bg"><div class="savings-bar-fill" style="width:${Math.min((savings/totalBasePay)*100,100).toFixed(1)}%"></div></div>
+      <span class="savings-pct">${fmtPct((savings/totalBasePay)*100)}</span>
+    </div>` : ''}
+
+    ${useProp && propVal0 > 0 ? `
+    <div class="equity-section">
+      <div class="equity-section-header">
+        <div class="equity-title">🏠 Þróun eignar yfir lánstímann</div>
+        <div class="equity-badges">
+          <span class="equity-badge equity-badge-prop">Markaðsvirði</span>
+          <span class="equity-badge equity-badge-loan">Eftirstöðvar</span>
+          <span class="equity-badge equity-badge-eq">Eign</span>
+        </div>
+      </div>
+      <div class="equity-gauge-wrap">
+        <div class="equity-gauge">
+          <svg viewBox="0 0 110 55" width="110" height="55">
+            <path d="M8,52 A46,46 0 0,1 102,52" fill="none" stroke="#2a3045" stroke-width="9" stroke-linecap="round"/>
+            <path d="M8,52 A46,46 0 0,1 102,52" fill="none" stroke="#4fffb0" stroke-width="9" stroke-linecap="round"
+              stroke-dasharray="144" stroke-dashoffset="${144 - (144 * Math.min(Math.max(curEqPct,0),100)/100)}"/>
+          </svg>
+        </div>
+        <div>
+          <div class="equity-gauge-pct">${fmtPct(curEqPct)}</div>
+          <div class="equity-gauge-text">Eignarhlutfall í dag</div>
+          <div style="font-size:0.6rem;color:var(--muted);margin-top:2px">${fmt(curEq)} af ${fmt(propVal0)}</div>
+        </div>
+      </div>
+      <canvas id="chartEquity" style="max-height:220px"></canvas>
+    </div>` : ''}
+
+    <div class="chart-container">
+      <div class="chart-title">Ársgreiðslur — öll lán</div>
+      <canvas id="chartPay"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-title">Eftirstöðvar höfuðstóls</div>
+      <canvas id="chartBal"></canvas>
+    </div>
+
+    <div class="table-wrapper">
+      <div class="table-header">
+        <div class="table-title">Greiðsluáætlun</div>
+        <div class="table-controls">
+          <div class="view-mode-toggle">
+            <button class="view-mode-btn active" id="vmBtn-single" onclick="setTableScope('single')">Hvert lán</button>
+            <button class="view-mode-btn" id="vmBtn-all" onclick="setTableScope('all')">Öll lán</button>
+          </div>
+          <div class="view-mode-toggle">
+            <button class="view-mode-btn active" id="vmBtn-annual" onclick="setTablePeriod('annual')">Árslegt</button>
+            <button class="view-mode-btn" id="vmBtn-monthly" onclick="setTablePeriod('monthly')">Mánaðarlegt</button>
+          </div>
+          <div class="loan-selector" id="loanTabs"></div>
+        </div>
+      </div>
+      <div id="tableContent"></div>
+      <button class="show-more-btn" id="showMoreBtn" onclick="toggleShowAll()">Sýna allt ▼</button>
+      <button class="excel-btn-bottom" onclick="exportToExcel()">⬇ Sækja í Excel</button>
+    </div>`;
+}
+
+function mountCharts(results, equitySeries, maxYears, useProp, propVal0) {
+  const labels = Array.from({ length: maxYears }, (_, i) => `Ár ${i+1}`);
+  const cOpts = buildChartOpts(false);
+
+  if (useProp && propVal0 > 0 && equitySeries.length) {
+    charts['equity'] = new Chart(document.getElementById('chartEquity'), {
+      type: 'line',
+      data: {
+        labels: equitySeries.map(s => `Ár ${s.year}`),
+        datasets: [
+          { label: 'Markaðsvirði', data: equitySeries.map(s => s.propVal), borderColor: '#ffd166', backgroundColor: 'rgba(255,209,102,0.07)', borderWidth: 2.5, fill: true, tension: 0.3, pointRadius: 2 },
+          { label: 'Eftirstöðvar lána', data: equitySeries.map(s => s.totalDebt), borderColor: '#ff6b6b', backgroundColor: 'rgba(255,107,107,0.07)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 2 },
+          { label: 'Eign', data: equitySeries.map(s => s.equity), borderColor: '#4fffb0', backgroundColor: 'rgba(79,255,176,0.1)', borderWidth: 2.5, fill: true, tension: 0.3, pointRadius: 2 },
+        ]
+      },
+      options: { ...cOpts, plugins: { ...cOpts.plugins, tooltip: { callbacks: {
+        label: ctx => `${ctx.dataset.label}: ${fmtNum(ctx.raw)} kr.`,
+        afterBody: items => [`Eignarhlutfall: ${fmtPct(equitySeries[items[0].dataIndex].equityPct)}`]
+      } } } }
+    });
+  }
+
+  charts['pay'] = new Chart(document.getElementById('chartPay'), {
+    type: 'bar',
+    data: { labels, datasets: results.map((r, i) => ({ label: `Lán ${r.id}`, data: Array.from({ length: maxYears }, (_, y) => y < r.schedule.length ? r.schedule[y].payment : 0), backgroundColor: COLORS[i%COLORS.length]+'99', borderColor: COLORS[i%COLORS.length], borderWidth: 1, stack: 'p' })) },
+    options: buildChartOpts(true)
+  });
+
+  charts['bal'] = new Chart(document.getElementById('chartBal'), {
+    type: 'line',
+    data: { labels, datasets: results.map((r, i) => ({ label: `Lán ${r.id}`, data: Array.from({ length: maxYears }, (_, y) => y < r.schedule.length ? r.schedule[y].balanceAfter : 0), borderColor: COLORS[i%COLORS.length], backgroundColor: COLORS[i%COLORS.length]+'22', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 2 })) },
+    options: cOpts
+  });
+}
+
+function buildChartOpts(stacked) {
+  return {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#6b7694', font: { family: 'IBM Plex Mono', size: 11 } } },
+      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtNum(ctx.raw)} kr.` } }
+    },
+    scales: {
+      x: { ticks: { color: '#6b7694', font: { family: 'IBM Plex Mono', size: 10 } }, grid: { color: '#2a304533' }, stacked },
+      y: { ticks: { color: '#6b7694', font: { family: 'IBM Plex Mono', size: 10 }, callback: v => (v/1e6).toLocaleString('is-IS', {maximumFractionDigits:1})+'M' }, grid: { color: '#2a304533' }, stacked }
+    }
+  };
+}
+
+// ── TABLE VIEW MODE ───────────────────────────────────────────────────────────
+// Two independent axes: scope (single | all) × period (annual | monthly)
+
+function setTableScope(scope) {
+  tableViewMode = scope + '_' + (tableViewMode.split('_')[1] || 'annual');
+  document.getElementById('vmBtn-single')?.classList.toggle('active', scope === 'single');
+  document.getElementById('vmBtn-all')?.classList.toggle('active', scope === 'all');
+  const tabs = document.getElementById('loanTabs');
+  if (tabs) tabs.style.display = scope === 'single' ? '' : 'none';
+  dispatchTableRender();
+}
+
+function setTablePeriod(period) {
+  tableViewMode = (tableViewMode.split('_')[0] || 'single') + '_' + period;
+  document.getElementById('vmBtn-annual')?.classList.toggle('active', period === 'annual');
+  document.getElementById('vmBtn-monthly')?.classList.toggle('active', period === 'monthly');
+  dispatchTableRender();
+}
+
+function setTableView(mode) {
+  // Legacy shim kept for any remaining callers
+  const [scope, period] = mode.includes('_') ? mode.split('_') : [mode, 'annual'];
+  tableViewMode = (scope || 'single') + '_' + (period || 'annual');
+  dispatchTableRender();
+}
+
+function dispatchTableRender(showAll) {
+  const [scope, period] = tableViewMode.split('_');
+  const sa = showAll !== undefined ? showAll : false;
+  const r = lastResults[tableActiveLoanIdx] || lastResults[0];
+  if (scope === 'all' && period === 'monthly') renderTableAllMonthly(lastResults, sa);
+  else if (scope === 'all') renderTableAll(lastResults, sa);
+  else if (period === 'monthly') renderTableMonthly(r, sa);
+  else renderTable(r, sa);
+}
+
+// ── SINGLE LOAN TABLE ─────────────────────────────────────────────────────────
+
+function renderTable(r, showAll) {
+  if (!r) return;
+  if (r.id !== undefined) tableShowAll[r.id] = showAll;
+  // Year 0 always shown; limit applies to years 1+
+  const year0 = r.schedule[0]?.isYear0 ? [r.schedule[0]] : [];
+  const rest   = r.schedule.filter(row => !row.isYear0);
+  const sliced = showAll ? rest : rest.slice(0, 10);
+  const rows   = [...year0, ...sliced];
+
+  if (r.isHMS) {
+    const hmsRows = r.schedule.filter(row => !row.isYear0);
+    const displayRows = showAll ? hmsRows : hmsRows.slice(0, 10);
+    document.getElementById('tableContent').innerHTML = `
+      <table class="amort-table">
+        <thead><tr>
+          <th>Ár</th>
+          <th>Verðbólga</th>
+          <th>Spáð staða HMS láns (kr.)</th>
+        </tr></thead>
+        <tbody>
+          <tr style="background:rgba(255,255,255,0.02);opacity:0.7">
+            <td style="color:var(--accent);font-size:0.65rem">Ár 0 — Upphaf</td>
+            <td>${fmtPct(r.currentInflation || 0)}</td>
+            <td><strong>${fmtNum(r.amount)}</strong></td>
+          </tr>
+          ${displayRows.map(row => `
+          <tr>
+            <td>${row.year}</td>
+            <td>${fmtPct(row.infl)}</td>
+            <td>${fmtNum(row.balance)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+    setShowMore(hmsRows.length, 10, showAll, r, 'single');
+    return;
+  }
+
+  const isVT = r.type === 'vt';
+  const tbody = rows.map(row => {
+    const ovr = inlineOverrides[r.id]?.[row.year];
+    const extraDisplay = ovr !== undefined ? ovr : row.extraPrincipal;
+    const isChanged = ovr !== undefined;
+    if (row.isYear0) {
+      return `<tr style="background:rgba(255,255,255,0.02);opacity:0.7">
+        <td style="color:var(--accent);font-size:0.65rem;letter-spacing:0.5px">Ár 0 — Upphaf</td>
+        <td>${fmtPct(row.rate)}</td>
+        ${isVT ? `<td>${fmtPct(row.infl)}</td>` : ''}
+        <td><strong>${fmtNum(row.balance)}</strong></td>
+        ${isVT ? `<td>—</td>` : ''}
+        <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+      </tr>`;
+    }
+    return `<tr class="${row.hasExtra || isChanged ? 'has-extra' : ''}">
+      <td>${row.year}${row.hasExtra || isChanged ? ' ⚡' : ''}</td>
+      <td>${fmtPct(row.rate)}</td>
+      ${isVT ? `<td>${fmtPct(row.infl)}</td>` : ''}
+      <td>${fmtNum(row.balance)}</td>
+      ${isVT ? `<td class="col-blue">${fmtNum(row.inflAdd)}</td>` : ''}
+      <td class="col-red">${fmtNum(row.interest)}</td>
+      <td>${fmtNum(row.principal)}</td>
+      <td class="extra-cell">
+        <input class="extra-inline${isChanged ? ' changed' : ''}" type="text"
+          value="${isChanged ? fmtNum(ovr) : (extraDisplay > 0 ? fmtNum(extraDisplay) : '')}"
+          placeholder="0" title="Aukagreiðsla þetta ár"
+          data-loanid="${r.id}" data-year="${row.year}"
+          onchange="applyInlineOverride(this)"
+          onkeydown="if(event.key==='Enter'){this.blur()}"
+          onfocus="this.select()">
+      </td>
+      <td class="col-blue">${fmtNum(row.monthlyPayment)}</td>
+      <td style="color:var(--muted)">${row.fee > 0 ? fmtNum(row.fee) : '—'}</td>
+      <td class="col-yellow">${fmtNum(row.payment)}</td>
+      <td class="col-orange">${fmtNum(row.pvMonthly)}</td>
+      <td class="col-orange">${fmtNum(row.pvBalance)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableContent').innerHTML = `
+    <table class="amort-table">
+      <thead><tr>
+        <th>Ár</th><th>Vextir</th>
+        ${isVT ? '<th>Verðbólga</th>' : ''}
+        <th>Eftirstöðvar</th>
+        ${isVT ? '<th>Verðbætur</th>' : ''}
+        <th>Vextir kr.</th><th>Afborgun</th>
+        <th class="col-purple">Aukagreiðsla ár</th>
+        <th class="col-blue">Greiðsla/mán.</th>
+        <th style="color:var(--muted)">Afgr.gjald/ár</th>
+        <th>Ársgreiðsla</th>
+        <th class="col-orange">NV greiðsla/mán.</th>
+        <th class="col-orange">NV eftirstöðvar</th>
+      </tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>`;
+  setShowMore(rest.length, 10, showAll, r, 'single');
+}
+
+// ── ALL LOANS COMBINED TABLE ──────────────────────────────────────────────────
+
+function renderTableAll(results, showAll) {
+  if (!results || !results.length) return;
+  const maxYears = Math.max(...results.map(r => r.actualYears));
+  const displayYears = showAll ? maxYears : Math.min(10, maxYears);
+  const nonHMS = results.filter(r => !r.isHMS);
+  const hmsLoans = results.filter(r => r.isHMS);
+
+  const tbody = [];
+  for (let y = 1; y <= displayYears; y++) {
+    let totPay = 0, totInt = 0, totPrin = 0, totExtra = 0, totFee = 0, totPVM = 0;
+    let anyExtra = false;
+    const loanCols = nonHMS.map(r => {
+      const row = r.schedule.find(s => s.year === y);
+      if (!row) return '<td>—</td>';
+      totPay += row.payment; totInt += row.interest; totPrin += row.principal;
+      totExtra += row.extraPrincipal; totFee += row.fee||0; totPVM += row.pvMonthly;
+      if (row.hasExtra || inlineOverrides[r.id]?.[y] !== undefined) anyExtra = true;
+      return `<td class="col-yellow" style="opacity:0.8">${fmtNum(row.payment)}</td>`;
+    }).join('');
+    const hmsCols = hmsLoans.map(r => {
+      const row = r.schedule.find(s => s.year === y);
+      return `<td class="col-red" style="opacity:0.7">${row ? fmtNum(row.balance) : '—'}</td>`;
+    }).join('');
+    tbody.push(`<tr class="${anyExtra ? 'has-extra' : ''}">
+      <td>${y}${anyExtra ? ' ⚡' : ''}</td>
+      ${loanCols}${hmsCols}
+      <td class="col-red">${fmtNum(totInt)}</td>
+      <td>${fmtNum(totPrin)}</td>
+      <td class="col-purple">${totExtra > 0 ? fmtNum(totExtra) : '—'}</td>
+      <td style="color:var(--muted)">${totFee > 0 ? fmtNum(totFee) : '—'}</td>
+      <td class="col-blue">${fmtNum(Math.round(totPay/12))}</td>
+      <td class="col-yellow">${fmtNum(totPay)}</td>
+      <td class="col-orange">${fmtNum(totPVM)}</td>
+    </tr>`);
+  }
+
+  const loanThs = nonHMS.map(r => `<th class="col-yellow" style="opacity:0.8">Lán ${r.id}</th>`).join('');
+  const hmsThs = hmsLoans.map(r => `<th class="col-red" style="opacity:0.7">HMS ${r.id} staða</th>`).join('');
+
+  document.getElementById('tableContent').innerHTML = `
+    <table class="amort-table">
+      <thead><tr>
+        <th>Ár</th>${loanThs}${hmsThs}
+        <th>Vextir kr.</th><th>Afborgun</th>
+        <th class="col-purple">Aukagreiðsla</th>
+        <th style="color:var(--muted)">Afgr.gjald</th>
+        <th class="col-blue">Greiðsla/mán.</th>
+        <th>Ársgreiðsla</th>
+        <th class="col-orange">NV /mán.</th>
+      </tr></thead>
+      <tbody>${tbody.join('')}</tbody>
+    </table>`;
+  setShowMore(maxYears, 10, showAll, null, 'all');
+}
+
+// ── ALL LOANS — MONTHLY ───────────────────────────────────────────────────────
+
+function renderTableAllMonthly(results, showAll) {
+  if (!results || !results.length) return;
+  const nonHMS = results.filter(r => !r.isHMS);
+  if (!nonHMS.length) {
+    document.getElementById('tableContent').innerHTML =
+      `<div style="padding:20px;color:var(--muted);font-size:0.75rem;text-align:center">Engin venjuleg lán til að sýna mánaðarlega.</div>`;
+    setShowMore(0, 0, false, null);
+    return;
+  }
+  const maxYears  = Math.max(...nonHMS.map(r => r.actualYears));
+  const totalMonths = maxYears * 12;
+  const displayMonths = showAll ? totalMonths : Math.min(24, totalMonths);
+
+  const monthlyRows = [];
+  for (let m = 1; m <= displayMonths; m++) {
+    const yr = Math.ceil(m / 12);
+    const mn = ((m - 1) % 12) + 1;
+    let totPay = 0, totInt = 0, totPrin = 0, totExtra = 0, totFee = 0, totPVM = 0;
+    let anyExtra = false;
+
+    const loanCols = nonHMS.map(r => {
+      const row = r.schedule[yr]; // index yr (year 0 at index 0, year 1 at index 1)
+      if (!row) return '<td>—</td>';
+      const mPay = Math.round(row.payment / 12);
+      const mInt = Math.round(row.interest / 12);
+      const mPrin = Math.round(row.principal / 12);
+      const mExtra = Math.round(row.extraPrincipal / 12);
+      const mFee = Math.round((row.fee || 0) / 12);
+      totPay += mPay; totInt += mInt; totPrin += mPrin;
+      totExtra += mExtra; totFee += mFee; totPVM += row.pvMonthly;
+      if (row.hasExtra || inlineOverrides[r.id]?.[yr] !== undefined) anyExtra = true;
+      return `<td class="col-yellow" style="opacity:0.8">${fmtNum(mPay)}</td>`;
+    }).join('');
+
+    monthlyRows.push(`<tr class="${anyExtra ? 'has-extra' : ''}">
+      <td>${yr}/${mn < 10 ? '0'+mn : mn}${anyExtra ? ' ⚡' : ''}</td>
+      ${loanCols}
+      <td class="col-red">${fmtNum(totInt)}</td>
+      <td>${fmtNum(totPrin)}</td>
+      <td class="col-purple">${totExtra > 0 ? fmtNum(totExtra) : '—'}</td>
+      <td style="color:var(--muted)">${totFee > 0 ? fmtNum(totFee) : '—'}</td>
+      <td class="col-yellow">${fmtNum(totPay)}</td>
+      <td class="col-orange">${fmtNum(totPVM)}</td>
+    </tr>`);
+  }
+
+  const loanThs = nonHMS.map(r => `<th class="col-yellow" style="opacity:0.8">Lán ${r.id} /mán.</th>`).join('');
+  document.getElementById('tableContent').innerHTML = `
+    <table class="amort-table">
+      <thead><tr>
+        <th>Ár/Mán.</th>${loanThs}
+        <th>Vextir kr.</th><th>Afborgun</th>
+        <th class="col-purple">Aukagreiðsla</th>
+        <th style="color:var(--muted)">Afgr.gjald</th>
+        <th>Mánaðargreiðsla</th>
+        <th class="col-orange">NV /mán.</th>
+      </tr></thead>
+      <tbody>${monthlyRows.join('')}</tbody>
+    </table>`;
+  setShowMore(totalMonths, 24, showAll, null, 'all_monthly');
+}
+
+// ── MONTHLY BREAKDOWN TABLE ───────────────────────────────────────────────────
+
+function renderTableMonthly(r, showAll) {
+  if (!r || r.isHMS) {
+    document.getElementById('tableContent').innerHTML =
+      `<div style="padding:20px;color:var(--muted);font-size:0.75rem;text-align:center">Mánaðarlegt yfirlit er ekki í boði fyrir HMS hlutdeildarlán.</div>`;
+    setShowMore(0, 0, false, null);
+    return;
+  }
+  const totalMonths = r.actualYears * 12;
+  const displayMonths = showAll ? totalMonths : Math.min(24, totalMonths);
+  const isVT = r.type === 'vt';
+
+  const monthlyRows = [`<tr style="background:rgba(255,255,255,0.02);opacity:0.7">
+    <td style="color:var(--accent);font-size:0.65rem">0/00 — Upphaf</td>
+    <td>${fmtPct(r.currentRate)}</td>
+    ${isVT ? `<td>${fmtPct(r.currentInflation)}</td>` : ''}
+    <td><strong>${fmtNum(r.amount)}</strong></td>
+    ${isVT ? '<td>—</td>' : ''}
+    <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+  </tr>`];
+  // schedule[0] = year 0, schedule[y] = year y
+  for (let m = 1; m <= displayMonths; m++) {
+    const yr = Math.ceil(m / 12);
+    const mn = ((m - 1) % 12) + 1;
+    const row = r.schedule[yr]; // yr index (year 0 is at index 0, year 1 at index 1)
+    if (!row) break;
+    const mPayment  = Math.round(row.payment / 12);
+    const mInterest = Math.round(row.interest / 12);
+    const mPrincipal = Math.round(row.principal / 12);
+    const mExtra    = Math.round(row.extraPrincipal / 12);
+    const mFee      = Math.round((row.fee || 0) / 12);
+    const mInflAdd  = Math.round((row.inflAdd || 0) / 12);
+    const balStart  = row.balance;
+    const balEnd    = row.balanceAfter;
+    const mBalance  = Math.round(balStart + (balEnd - balStart) * (mn / 12));
+    monthlyRows.push(`<tr>
+      <td>${yr}/${mn < 10 ? '0'+mn : mn}</td>
+      <td>${fmtPct(row.rate)}</td>
+      ${isVT ? `<td>${fmtPct(row.infl)}</td>` : ''}
+      <td>${fmtNum(mBalance)}</td>
+      ${isVT ? `<td class="col-blue">${fmtNum(mInflAdd)}</td>` : ''}
+      <td class="col-red">${fmtNum(mInterest)}</td>
+      <td>${fmtNum(mPrincipal)}</td>
+      <td class="col-purple">${mExtra > 0 ? fmtNum(mExtra) : '—'}</td>
+      <td style="color:var(--muted)">${mFee > 0 ? fmtNum(mFee) : '—'}</td>
+      <td class="col-yellow">${fmtNum(mPayment)}</td>
+      <td class="col-orange">${fmtNum(row.pvMonthly)}</td>
+    </tr>`);
+  }
+
+  document.getElementById('tableContent').innerHTML = `
+    <table class="amort-table">
+      <thead><tr>
+        <th>Ár/Mán.</th><th>Vextir</th>
+        ${isVT ? '<th>Verðbólga</th>' : ''}
+        <th>Eftirstöðvar</th>
+        ${isVT ? '<th>Verðbætur</th>' : ''}
+        <th>Vextir kr.</th><th>Afborgun</th>
+        <th class="col-purple">Aukagreiðsla</th>
+        <th style="color:var(--muted)">Afgr.gjald</th>
+        <th>Mánaðargreiðsla</th>
+        <th class="col-orange">NV greiðsla</th>
+      </tr></thead>
+      <tbody>${monthlyRows.join('')}</tbody>
+    </table>`;
+  setShowMore(totalMonths, 24, showAll, r, 'monthly');
+}
+
+// ── SHOW MORE HELPER ──────────────────────────────────────────────────────────
+
+function setShowMore(total, limit, showAll, ref, mode) {
+  const btn = document.getElementById('showMoreBtn');
+  if (!btn) return;
+  if (total <= limit) { btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  const isMonthly = mode === 'monthly' || mode === 'all_monthly';
+  const unit = isMonthly ? 'mánuðir' : 'ár';
+  btn.textContent = showAll ? 'Sýna minna ▲' : `Sýna allt (${total} ${unit}) ▼`;
+  btn._ref = ref; btn._mode = mode || 'single_annual'; btn._showAll = showAll;
+}
+
+function applyInlineOverride(input) {
+  const loanId = parseInt(input.dataset.loanid);
+  const year   = parseInt(input.dataset.year);
+  const val    = parseNum(input.value);
+
+  if (!inlineOverrides[loanId]) inlineOverrides[loanId] = {};
+
+  if (isNaN(val) || input.value.trim() === '' || val === 0) {
+    delete inlineOverrides[loanId][year];
+    input.classList.remove('changed');
+  } else {
+    inlineOverrides[loanId][year] = Math.round(val);
+    input.classList.add('changed');
+    // Format the value back with Icelandic formatting
+    input.value = fmtNum(Math.round(val));
+  }
+
+  recalcWithOverrides();
+}
+
+function toggleShowAll() {
+  const btn = document.getElementById('showMoreBtn');
+  if (!btn) return;
+  dispatchTableRender(!btn._showAll);
+}
+
+// ── PURCHASING POWER HELPERS ──────────────────────────────────────────────────
+
+function buildPPCards(capacity, rateAtY, remYears, dpPcts) {
+  if (capacity <= 0) {
+    return `<div style="color:var(--muted);font-size:0.72rem;padding:10px 0">
+      Engin greiðslugeta til að reikna — lán eru greidd upp á þessu ári.
+    </div>`;
+  }
+  const r_mo = rateAtY / 100 / 12;
+  const n_mo = Math.max(remYears, 1) * 12;
+  const af = r_mo > 0 ? r_mo / (1 - Math.pow(1 + r_mo, -n_mo)) : 1 / n_mo;
+  const maxLoan = capacity / af;
+  const cards = dpPcts.map(dp => {
+    const maxProp = maxLoan / (1 - dp / 100);
+    return { dp, maxLoan: Math.round(maxLoan), maxProp: Math.round(maxProp) };
+  });
+  const maxPropAll = cards[cards.length - 1].maxProp;
+  return cards.map(c => `
+    <div class="pp-card">
+      <div class="pp-dp-pct">${c.dp}% útborgun</div>
+      <div class="pp-prop-val">${fmt(c.maxProp)}</div>
+      <div class="pp-sub">Lán: ${fmt(c.maxLoan)}</div>
+      <div class="pp-bar-bg"><div class="pp-bar-fill" style="width:${Math.min((c.maxProp/maxPropAll)*100,100).toFixed(1)}%"></div></div>
+    </div>`).join('');
+}
+
+let _ppCurrentYear = 0;
+
+function ppSetYear(y) {
+  _ppCurrentYear = y;
+  const series = _ppSeriesData;
+  const dpPcts = _ppDpPctsData;
+  if (!series || !series.length || y >= series.length) return;
+  const pt = series[y];
+  const capacity = pt.monPay - pt.feeMon;
+
+  document.getElementById('ppYearVal').textContent = y;
+  const slider = document.getElementById('ppSlider');
+  if (slider) slider.value = y;
+
+  const desc = document.getElementById('ppDesc');
+  if (desc) {
+    const capFmt = capacity > 0 ? fmt(capacity) + '/mán.' : 'engin (lán greidd upp)';
+    desc.innerHTML = `Ár ${y} — greiðslugeta: <strong style="color:var(--verified)">${capFmt}</strong>
+      við meðalvöxtum <strong style="color:var(--verified)">${fmtPct(pt.rateAtY)}</strong>
+      og eftirstöðvar lánstíma <strong style="color:var(--verified)">${Math.round(pt.remYears)} ár</strong>.`;
+  }
+
+  const grid = document.getElementById('ppGrid');
+  if (grid) grid.innerHTML = buildPPCards(Math.max(capacity, 0), pt.rateAtY, pt.remYears, dpPcts);
+}
+
+function ppChangeYear(delta) {
+  const series = _ppSeriesData;
+  if (!series || !series.length) return;
+  const newY = Math.max(0, Math.min(_ppCurrentYear + delta, series.length - 1));
+  ppSetYear(newY);
+}
+
+function togglePP() {
+  const body = document.getElementById('ppBody');
+  const chev = document.getElementById('ppChevron');
+  if (!body) return;
+  const open = body.style.display === 'none';
+  body.style.display = open ? '' : 'none';
+  chev.textContent = open ? '▲' : '▼';
+}
+
+// ── EXCEL EXPORT ─────────────────────────────────────────────────────────────
+// Builds a multi-sheet workbook using the SpreadsheetML XML format (.xls)
+// which Excel opens natively without any library dependency.
+
+function exportToExcel() {
+  if (!lastResults.length) { alert('Reiknaðu fyrst.'); return; }
+
+  const sheets = [];
+
+  // ── Summary sheet ──
+  const nonHMS = lastResults.filter(r => !r.isHMS);
+  const summaryRows = [
+    ['Lánareiknir — Samantekt', '', '', ''],
+    [''],
+    ['Lán', 'Tegund', 'Greiðslumáti', 'Upphæð (kr.)', 'Lánstími (ár)', 'Núv. vextir (%)', 'Meðalvextir (%)'],
+    ...lastResults.map(r => [
+      `Lán ${r.id}`,
+      r.isHMS ? 'HMS Hlutdeildarlán' : (r.type === 'vt' ? 'Verðtryggt' : 'Óverðtryggt'),
+      r.isHMS ? 'Engar greiðslur' : (r.method === 'annuitet' ? 'Jafnar greiðslur' : 'Jafnar afborganir'),
+      r.amount,
+      r.actualYears,
+      r.isHMS ? '' : r.currentRate,
+      r.isHMS ? '' : r.avgRate,
+    ]),
+    [''],
+    ['Heildarupphæð lána', lastResults.reduce((s,r)=>s+r.amount,0)],
+    ['Heildargreiðslur', lastResults.reduce((s,r)=>s+r.totPay,0)],
+    ['Heildarvextir', nonHMS.reduce((s,r)=>s+r.totInt,0)],
+    ['Heildar verðbætur', nonHMS.reduce((s,r)=>s+r.totInfl,0)],
+    ['Heildar afgreiðslugjöld', nonHMS.reduce((s,r)=>s+(r.totFees||0),0)],
+    ['Meðalgreiðsla / mánuð', lastResults.reduce((s,r)=>s+r.avgMonthly,0)],
+  ];
+  sheets.push({ name: 'Samantekt', rows: summaryRows });
+
+  // ── Per-loan sheets ──
+  lastResults.forEach(r => {
+    const isVT = r.type === 'vt';
+    const headers = r.isHMS
+      ? ['Ár', 'Verðbólga (%)', 'Spáð staða HMS láns (kr.)']
+      : [
+          'Ár', 'Vextir (%)', ...(isVT ? ['Verðbólga (%)'] : []),
+          'Eftirstöðvar (kr.)', ...(isVT ? ['Verðbætur (kr.)'] : []),
+          'Vextir (kr.)', 'Afborgun (kr.)', 'Aukagreiðsla (kr.)',
+          'Afgr.gjald (kr.)', 'Greiðsla/mán. (kr.)', 'Ársgreiðsla (kr.)',
+          'NV greiðsla/mán. (kr.)', 'NV eftirstöðvar (kr.)',
+        ];
+
+    const dataRows = r.schedule.map(row => r.isHMS
+      ? [row.year, round2(row.infl), row.balance]
+      : [
+          row.year, round2(row.rate), ...(isVT ? [round2(row.infl)] : []),
+          row.balance, ...(isVT ? [row.inflAdd] : []),
+          row.interest, row.principal, row.extraPrincipal,
+          row.fee || 0, row.monthlyPayment, row.payment,
+          row.pvMonthly, row.pvBalance,
+        ]
+    );
+
+    // Totals row for non-HMS
+    if (!r.isHMS) {
+      const totRow = [
+        'Samtals', '', ...(isVT ? [''] : []),
+        '', ...(isVT ? [r.schedule.reduce((s,x)=>s+x.inflAdd,0)] : []),
+        r.totInt, r.amount,
+        r.schedule.reduce((s,x)=>s+x.extraPrincipal,0),
+        r.totFees||0,
+        '',
+        r.totPay,
+        '', '',
+      ];
+      dataRows.push(totRow);
+    }
+
+    sheets.push({ name: `Lán ${r.id}`, rows: [headers, ...dataRows] });
+  });
+
+  // ── Build SpreadsheetML XML ──
+  const xmlSheets = sheets.map(sheet => {
+    const rowsXml = sheet.rows.map(row => {
+      const cells = row.map(cell => {
+        if (cell === '' || cell === undefined || cell === null) return '<Cell/>';
+        if (typeof cell === 'number') {
+          return `<Cell><Data ss:Type="Number">${cell}</Data></Cell>`;
+        }
+        const escaped = String(cell).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        return `<Cell><Data ss:Type="String">${escaped}</Data></Cell>`;
+      }).join('');
+      return `<Row>${cells}</Row>`;
+    }).join('\n');
+
+    const safeName = sheet.name.replace(/[\\\/\?\*\[\]]/g, '_').substring(0, 31);
+    return `<Worksheet ss:Name="${safeName}"><Table>${rowsXml}</Table></Worksheet>`;
+  }).join('\n');
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:x="urn:schemas-microsoft-com:office:excel">
+  <Styles>
+    <Style ss:ID="Default"><Font ss:FontName="Calibri" ss:Size="11"/></Style>
+  </Styles>
+  ${xmlSheets}
+</Workbook>`;
+
+  const blob = new Blob(['\uFEFF' + xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `lanarekningur_${new Date().toISOString().slice(0,10)}.xls`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function round2(n) { return Math.round(n * 100) / 100; }
+
+addLoan();
+</script>
+</body>
+</html>
