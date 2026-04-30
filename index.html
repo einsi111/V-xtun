@@ -122,6 +122,15 @@
 
   .add-loan-btn { width: 100%; background: rgba(79,255,176,0.04); border: 1px dashed rgba(79,255,176,0.32); color: var(--accent); font-family: 'IBM Plex Mono', monospace; font-size: 0.74rem; letter-spacing: 1px; text-transform: uppercase; padding: 10px; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
   .add-loan-btn:hover { background: rgba(79,255,176,0.1); border-style: solid; }
+
+  .infl-fetch-btn {
+    width: 100%; background: rgba(59,184,255,0.06); border: 1px solid rgba(59,184,255,0.28);
+    color: var(--verified); font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem;
+    letter-spacing: 0.5px; text-transform: uppercase; padding: 8px; border-radius: 6px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .infl-fetch-btn:hover { background: rgba(59,184,255,0.14); border-color: var(--verified); }
+  .infl-fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .calc-btn { width: 100%; background: var(--accent); color: #0d0f14; font-family: 'Syne', sans-serif; font-size: 0.85rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding: 12px; border: none; border-radius: 6px; cursor: pointer; transition: all 0.15s; margin-top: 11px; }
   .calc-btn:hover { background: #6fffbf; transform: translateY(-1px); }
   .calc-btn:active { transform: translateY(0); }
@@ -309,6 +318,12 @@
     </div>
 
     <div class="section-title">Lán</div>
+    <div id="inflFetchBar" style="margin-bottom:10px">
+      <button class="infl-fetch-btn" onclick="fetchInflation()" id="inflFetchBtn">
+        📡 Sækja verðbólgu frá Hagstofu
+      </button>
+      <div id="inflFetchStatus" style="font-size:0.6rem;color:var(--muted);margin-top:4px;display:none"></div>
+    </div>
     <div class="loans-container" id="loansContainer"></div>
     <button class="add-loan-btn" onclick="addLoan()">+ Bæta við láni</button>
     <button class="calc-btn" onclick="calculate()">Reikna</button>
@@ -1882,6 +1897,101 @@ function exportToExcel() {
 }
 
 function round2(n) { return Math.round(n * 100) / 100; }
+
+// ── HAGSTOFA INFLATION FETCH ──────────────────────────────────────────────────
+// Sækir nýjustu 12 mánaða verðlagsbreytingu úr PxWeb API Hagstofunnar.
+// Endapunktur: POST https://px.hagstofa.is/pxis/api/v1/is/Efnahagur/
+//   Efnahagur__visitolur__1_vnv__1_vnv/VIS01000.px
+// Við biðjum um "12 mánaða breyting" (liður 6) fyrir nýjasta tíma.
+
+async function fetchInflation() {
+  const btn = document.getElementById('inflFetchBtn');
+  const status = document.getElementById('inflFetchStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ Sæki...';
+  status.style.display = '';
+  status.textContent = 'Tengist Hagstofunni...';
+  status.style.color = 'var(--muted)';
+
+  const API_URL = 'https://px.hagstofa.is/pxis/api/v1/is/Efnahagur/Efnahagur__visitolur__1_vnv__1_vnv/VIS01000.px';
+
+  // Query: sækja "12 mánaða breyting" (Liður = "6"), nýjasta tíma
+  // Við biðjum um síðasta gildi með því að nota elimination=true á Tími
+  const query = {
+    "query": [
+      {
+        "code": "Liður",
+        "selection": {
+          "filter": "item",
+          "values": ["6"]  // 6 = 12 mánaða breyting %
+        }
+      }
+    ],
+    "response": {
+      "format": "json-stat2"
+    }
+  };
+
+  try {
+    const resp = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(query)
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    // json-stat2: gildi eru í data.value[], tími í data.dimension.Tími
+    const values = data.value;
+    const timeDim = data.dimension?.Tími?.category;
+    if (!values || values.length === 0) throw new Error('Engin gögn');
+
+    // Finna nýjasta gildi (síðast í röðinni)
+    let lastVal = null;
+    let lastTime = null;
+    for (let i = values.length - 1; i >= 0; i--) {
+      if (values[i] !== null && values[i] !== undefined) {
+        lastVal = values[i];
+        // Finna tímaheiti
+        if (timeDim?.index) {
+          const timeKeys = Object.keys(timeDim.index);
+          // index maps label→position; find key at position i
+          lastTime = timeKeys.find(k => timeDim.index[k] === i) || null;
+        }
+        break;
+      }
+    }
+
+    if (lastVal === null) throw new Error('Ekkert gildi fundið');
+
+    // Setta inn í alla verðbólgureiti á öllum lánum
+    const inflStr = lastVal.toLocaleString('is-IS', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+    const cards = document.querySelectorAll('.loan-card');
+    let updated = 0;
+    cards.forEach(card => {
+      const id = parseInt(card.id.replace('loan-', ''));
+      const type = document.getElementById(`type-${id}`)?.value;
+      // Setja í verðtryggt lán og HMS
+      const inflEl = document.getElementById(`inflation-${id}`);
+      const hmsInflEl = document.getElementById(`hms-inflation-${id}`);
+      if (inflEl) { inflEl.value = inflStr; inflEl.classList.remove('invalid'); updated++; }
+      if (hmsInflEl) { hmsInflEl.value = inflStr; }
+    });
+
+    const timeLabel = lastTime ? ` (${lastTime})` : '';
+    status.textContent = `✓ Verðbólga: ${inflStr}%${timeLabel} — sett inn í ${updated} lán`;
+    status.style.color = 'var(--accent)';
+    btn.textContent = `📡 ${inflStr}% — uppfæra aftur`;
+
+  } catch (err) {
+    status.textContent = `Villa: ${err.message}. Prófaðu að slá inn handvirkt.`;
+    status.style.color = 'var(--accent2)';
+    btn.textContent = '📡 Sækja verðbólgu frá Hagstofu';
+  } finally {
+    btn.disabled = false;
+  }
+}
 
 addLoan();
 </script>
