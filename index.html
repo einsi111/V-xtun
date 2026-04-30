@@ -1913,57 +1913,19 @@ async function fetchInflation() {
   status.textContent = 'Tengist Hagstofunni...';
   status.style.color = 'var(--muted)';
 
-  const API_URL = 'https://px.hagstofa.is/pxis/api/v1/is/Efnahagur/Efnahagur__visitolur__1_vnv__1_vnv/VIS01000.px';
-
-  // Query: sækja "12 mánaða breyting" (Liður = "6"), nýjasta tíma
-  // Við biðjum um síðasta gildi með því að nota elimination=true á Tími
-  const query = {
-    "query": [
-      {
-        "code": "Liður",
-        "selection": {
-          "filter": "item",
-          "values": ["6"]  // 6 = 12 mánaða breyting %
-        }
-      }
-    ],
-    "response": {
-      "format": "json-stat2"
-    }
-  };
+  const API_URL = '/api/inflation';
 
   try {
-    const resp = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(query)
-    });
+    const resp = await fetch(API_URL);
 
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
+    if (data.error) throw new Error(data.error);
 
-    // json-stat2: gildi eru í data.value[], tími í data.dimension.Tími
-    const values = data.value;
-    const timeDim = data.dimension?.Tími?.category;
-    if (!values || values.length === 0) throw new Error('Engin gögn');
+    const lastVal = data.value;
+    const lastTime = data.time;
 
-    // Finna nýjasta gildi (síðast í röðinni)
-    let lastVal = null;
-    let lastTime = null;
-    for (let i = values.length - 1; i >= 0; i--) {
-      if (values[i] !== null && values[i] !== undefined) {
-        lastVal = values[i];
-        // Finna tímaheiti
-        if (timeDim?.index) {
-          const timeKeys = Object.keys(timeDim.index);
-          // index maps label→position; find key at position i
-          lastTime = timeKeys.find(k => timeDim.index[k] === i) || null;
-        }
-        break;
-      }
-    }
-
-    if (lastVal === null) throw new Error('Ekkert gildi fundið');
+    if (lastVal === null || lastVal === undefined) throw new Error('Ekkert gildi fundið');
 
     // Setta inn í alla verðbólgureiti á öllum lánum
     const inflStr = lastVal.toLocaleString('is-IS', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
