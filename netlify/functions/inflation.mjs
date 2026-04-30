@@ -1,69 +1,70 @@
 export default async (req, context) => {
-  const BASE_URL = 'https://px.hagstofa.is/pxis/api/v1/is/Efnahagur/Efnahagur__visitolur__1_vnv__1_vnv/VIS01000.px';
-  const url = new URL(req.url);
+  const META_URL = 'https://px.hagstofa.is/pxis/api/v1/is/Efnahagur/Efnahagur__visitolur__1_vnv__1_vnv/VIS01000.px?query';
+  const DATA_URL = 'https://px.hagstofa.is/pxis/api/v1/is/Efnahagur/Efnahagur__visitolur__1_vnv__1_vnv/VIS01000.px';
 
-  // /api/inflation/meta — sýnir hvaða liðar eru til
-  if (url.pathname.endsWith('/meta')) {
-    try {
-      const r = await fetch(BASE_URL);
-      const d = await r.json();
-      return new Response(JSON.stringify(d, null, 2), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      });
-    } catch(e) {
-      return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    }
-  }
-
-  // Sækja metadata fyrst til að fá réttar gildi
   try {
-    const metaResp = await fetch(BASE_URL);
-    if (!metaResp.ok) throw new Error(`Meta HTTP ${metaResp.status}`);
-    const meta = await metaResp.json();
+    // PxWeb metadata: GET með ?query
+    const metaResp = await fetch(META_URL, {
+      headers: { 'Accept': 'application/json' }
+    });
 
-    // Finna Liður breytu
-    const liðVar = meta.variables?.find(v => v.code === 'Liður');
-    const tímiVar = meta.variables?.find(v => v.code === 'Tími');
-
-    if (!liðVar || !tímiVar) {
-      return new Response(JSON.stringify({ error: 'Fann ekki breytur', variables: meta.variables?.map(v => v.code) }), {
-        status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    if (!metaResp.ok) {
+      // Fallback: prófum án ?query
+      const metaResp2 = await fetch(DATA_URL, {
+        headers: { 'Accept': 'application/json' }
       });
-    }
-
-    // Finna 12 mánaða breyting kóða
-    let liðKóði = null;
-    let liðHeiti = null;
-    for (let i = 0; i < liðVar.values.length; i++) {
-      const heiti = liðVar.valueTexts?.[i] || liðVar.values[i];
-      if (/12.m[aá]n/i.test(heiti) || /12.month/i.test(heiti)) {
-        liðKóði = liðVar.values[i];
-        liðHeiti = heiti;
-        break;
+      if (!metaResp2.ok) {
+        return new Response(JSON.stringify({
+          error: `Meta failed: ${metaResp.status} / ${metaResp2.status}`
+        }), { status: 502, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
       }
     }
-    // Fallback: síðasti liðurinn
+
+    const meta = await (metaResp.ok ? metaResp : await fetch(DATA_URL)).json();
+
+    // Finna breytur
+    const liðVar  = meta.variables?.find(v => v.code === 'Liður' || v.code === 'lidur');
+    const tímiVar = meta.variables?.find(v => v.code === 'Tími'  || v.code === 'timi' || v.code === 'Timabil');
+
+    if (!liðVar || !tímiVar) {
+      return new Response(JSON.stringify({
+        error: 'Breytur ekki fundnar',
+        gotVariables: meta.variables?.map(v => ({ code: v.code, text: v.text })) ?? [],
+        rawMeta: meta
+      }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+    }
+
+    // Finna 12 mánaða breyting
+    let liðKóði = null, liðHeiti = null;
+    for (let i = 0; i < liðVar.values.length; i++) {
+      const h = liðVar.valueTexts?.[i] || liðVar.values[i];
+      if (/12.m[aá]n/i.test(h) || /12.month/i.test(h) || /12 m/i.test(h)) {
+        liðKóði = liðVar.values[i]; liðHeiti = h; break;
+      }
+    }
     if (!liðKóði) {
-      const last = liðVar.values.length - 1;
-      liðKóði = liðVar.values[last];
-      liðHeiti = liðVar.valueTexts?.[last] || liðKóði;
+      // Skila lista af öllum liðum svo við sjáum hvað er til
+      return new Response(JSON.stringify({
+        error: '12 mánaða liður ekki fundinn',
+        allLiðar: liðVar.values.map((v,i) => ({ kóði: v, heiti: liðVar.valueTexts?.[i] ?? v }))
+      }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
     // Nýjasti tími
-    const latestTími = tímiVar.values[tímiVar.values.length - 1];
-    const latestTímiHeiti = tímiVar.valueTexts?.[tímiVar.values.length - 1] || latestTími;
+    const n = tímiVar.values.length;
+    const latestTími      = tímiVar.values[n - 1];
+    const latestTímiHeiti = tímiVar.valueTexts?.[n - 1] || latestTími;
 
-    // Senda query með réttum kóðum
+    // Query
     const query = {
       query: [
-        { code: 'Liður', selection: { filter: 'item', values: [liðKóði] } },
-        { code: 'Tími', selection: { filter: 'item', values: [latestTími] } },
+        { code: liðVar.code,  selection: { filter: 'item', values: [liðKóði] } },
+        { code: tímiVar.code, selection: { filter: 'item', values: [latestTími] } },
       ],
       response: { format: 'json-stat2' },
     };
 
-    const dataResp = await fetch(BASE_URL, {
+    const dataResp = await fetch(DATA_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(query),
@@ -72,23 +73,14 @@ export default async (req, context) => {
     if (!dataResp.ok) {
       const txt = await dataResp.text();
       return new Response(JSON.stringify({
-        error: `Data HTTP ${dataResp.status}`,
-        detail: txt,
-        usedQuery: query,
-        allLiðar: liðVar.values.map((v,i) => ({ kóði: v, heiti: liðVar.valueTexts?.[i] })),
-      }), {
-        status: 502, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      });
+        error: `Data HTTP ${dataResp.status}`, detail: txt, query
+      }), { status: 502, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
-    const data = await dataResp.json();
-    const value = data.value?.[0];
+    const data   = await dataResp.json();
+    const value  = data.value?.[0];
 
-    return new Response(JSON.stringify({
-      value,
-      time: latestTímiHeiti,
-      liður: liðHeiti,
-    }), {
+    return new Response(JSON.stringify({ value, time: latestTímiHeiti, liður: liðHeiti }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
